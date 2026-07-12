@@ -65,8 +65,8 @@ const knownNames: Record<string, { name: string; type?: string; source?: string;
 
 const types = ["Hisse", "Fon", "Kripto", "Doviz", "Altin", "Nakit", "Diger"];
 const groupDefinitions = [
-  { key: "Altin", label: "Degerli Madenler" },
-  { key: "Fon", label: "Fonlar" },
+  { key: "precious", label: "Degerli Madenler" },
+  { key: "fund", label: "Yatirim Fonlari" },
   { key: "Hisse", label: "Hisse Senetleri" },
   { key: "Kripto", label: "Kriptolar" },
   { key: "Doviz", label: "Doviz" },
@@ -74,6 +74,8 @@ const groupDefinitions = [
   { key: "Diger", label: "Diger" },
 ];
 const colors = ["#2f6fed", "#12805c", "#bc3d32", "#7557d6", "#c77d0e", "#0f8b8d", "#596579"];
+const preciousCodes = new Set(["ALTINS1", "ALTIN", "GMSTRF", "GMSTR"]);
+const fundCodes = new Set(["TGE", "TMG", "KPH"]);
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -164,6 +166,20 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
   };
 }
 
+function assetGroupKey(asset: Asset) {
+  const code = compactCode(asset.ticker || asset.priceSymbol || "");
+  if (preciousCodes.has(code)) return "precious";
+  if (fundCodes.has(code) || asset.priceSource === "isportfoy" || asset.priceSource === "tefas") return "fund";
+  if (asset.type === "Altin") return "precious";
+  if (asset.type === "Fon") return "fund";
+  return asset.type || "Diger";
+}
+
+function assetGroupIndex(asset: Asset) {
+  const index = groupDefinitions.findIndex((group) => group.key === assetGroupKey(asset));
+  return index >= 0 ? index : groupDefinitions.length - 1;
+}
+
 async function api<T>(path: string, passcode: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -227,11 +243,12 @@ export default function Home() {
     return state.assets
       .filter((asset) => {
         const text = `${asset.ticker} ${asset.name}`.toLowerCase();
-        return text.includes(query.toLowerCase()) && (typeFilter === "all" || asset.type === typeFilter);
+        const selectedType = typeFilter === "Altin" ? "precious" : typeFilter === "Fon" ? "fund" : typeFilter;
+        return text.includes(query.toLowerCase()) && (typeFilter === "all" || assetGroupKey(asset) === selectedType || asset.type === typeFilter);
       })
       .sort((left, right) => {
-        const leftGroup = groupDefinitions.findIndex((group) => group.key === left.type);
-        const rightGroup = groupDefinitions.findIndex((group) => group.key === right.type);
+        const leftGroup = assetGroupIndex(left);
+        const rightGroup = assetGroupIndex(right);
         if (leftGroup !== rightGroup) return leftGroup - rightGroup;
         const rightValue = right.quantity * right.price * (right.fxRate || 1);
         const leftValue = left.quantity * left.price * (left.fxRate || 1);
@@ -243,7 +260,7 @@ export default function Home() {
     return groupDefinitions
       .map((group) => {
         const assets = filteredAssets
-          .filter((asset) => asset.type === group.key)
+          .filter((asset) => assetGroupKey(asset) === group.key)
           .sort((left, right) => {
             const rightValue = right.quantity * right.price * (right.fxRate || 1);
             const leftValue = left.quantity * left.price * (left.fxRate || 1);
@@ -708,15 +725,16 @@ export default function Home() {
                   const pl = value - cost;
                   const share = totals.totalValue ? (value / totals.totalValue) * 100 : 0;
                   const previous = filteredAssets[index - 1];
-                  const showGroup = !previous || previous.type !== asset.type;
-                  const group = groupedAssets.find((item) => item.key === asset.type);
+                  const currentGroupKey = assetGroupKey(asset);
+                  const showGroup = !previous || assetGroupKey(previous) !== currentGroupKey;
+                  const group = groupedAssets.find((item) => item.key === currentGroupKey);
                   return (
                     <Fragment key={asset.id}>
                     {showGroup && group ? (
                       <tr className="group-row">
                         <td colSpan={8}>
                           <div className="group-title">
-                            <span className="group-dot" style={{ background: colors[groupDefinitions.findIndex((item) => item.key === asset.type) % colors.length] }} />
+                            <span className="group-dot" style={{ background: colors[assetGroupIndex(asset) % colors.length] }} />
                             <strong>{group.label}</strong>
                             <small>{group.assets.length} varlik · {money(group.value)}</small>
                           </div>

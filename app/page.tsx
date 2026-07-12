@@ -104,6 +104,8 @@ const emptyState: PortfolioState = {
 };
 
 const knownNames: Record<string, { name: string; type?: string; source?: string; symbol?: string }> = {
+  NAKIT: { name: "Nakit", type: "Nakit", source: "manual", symbol: "NAKIT" },
+  CASH: { name: "Nakit", type: "Nakit", source: "manual", symbol: "NAKIT" },
   BTC: { name: "Bitcoin", type: "Kripto", source: "binance" },
   ETH: { name: "Ethereum", type: "Kripto", source: "binance" },
   LINK: { name: "Chainlink", type: "Kripto", source: "binance" },
@@ -429,20 +431,27 @@ function inferAssetDetails(input: string) {
 
 function normalizeAsset(asset: Partial<Asset>): Asset {
   const details = inferAssetDetails(asset.ticker || "");
+  const assetCode = compactCode(asset.ticker || details.ticker || "");
+  const isCash = assetCode === "NAKIT" || (asset.type || details.type) === "Nakit";
+  const normalizedType = isCash ? "Nakit" : asset.type || details.type;
+  const normalizedSource = isCash ? "manual" : asset.priceSource || details.priceSource;
+  const normalizedSymbol = isCash ? "NAKIT" : asset.priceSymbol || details.priceSymbol;
+  const avgCost = Number(asset.avgCost || (isCash ? 1 : 0));
+  const price = Number(asset.price || asset.avgCost || (isCash ? 1 : 0));
   return {
     id: asset.id || uid(),
     ticker: asset.ticker || details.ticker,
     name: asset.name || details.name,
-    type: asset.type || details.type,
+    type: normalizedType,
     currency: asset.currency || details.currency,
-    priceSource: asset.priceSource || details.priceSource,
-    priceSymbol: asset.priceSymbol || details.priceSymbol,
-    autoUpdate: asset.autoUpdate !== false && (asset.priceSource || details.priceSource) !== "manual",
+    priceSource: normalizedSource,
+    priceSymbol: normalizedSymbol,
+    autoUpdate: asset.autoUpdate !== false && normalizedSource !== "manual",
     fxRate: Number(asset.fxRate || details.fxRate || 1),
     quantity: Number(asset.quantity || 0),
-    avgCost: Number(asset.avgCost || 0),
+    avgCost,
     costMode: "unit",
-    price: Number(asset.price || asset.avgCost || 0),
+    price,
     target: Number(asset.target || 0),
     note: asset.note || "",
     lastPriceAt: asset.lastPriceAt,

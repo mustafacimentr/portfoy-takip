@@ -37,10 +37,15 @@ test("performance history screen is wired into the portfolio dashboard", async (
   assert.match(page, /Performans Gecmisi/);
   assert.match(page, /Portfoy Deger Gecmisi/);
   assert.match(page, /Nakit Akisi/);
+  assert.match(page, /Gercek Getiri Hesabi/);
+  assert.match(page, /cashFlowSummary/);
+  assert.match(page, /realReturnRate/);
+  assert.match(page, /editCashFlow/);
   assert.match(page, /rangeOptions/);
   assert.match(page, /withTodaySnapshot/);
   assert.match(page, /chartPoints\("totalValue"\)/);
   assert.match(css, /\.history-chart/);
   assert.match(css, /\.cash-flow-form/);
+  assert.match(css, /\.return-grid/);
   assert.match(css, /\.range-tabs/);
 });

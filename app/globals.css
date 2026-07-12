@@ -669,7 +669,7 @@ select:focus {
 
 .cash-flow-form {
   display: grid;
-  grid-template-columns: 150px 150px 160px minmax(160px, 1fr) auto;
+  grid-template-columns: 150px 150px 160px minmax(160px, 1fr) auto auto;
   gap: 10px;
   align-items: center;
 }
@@ -681,7 +681,7 @@ select:focus {
 
 .cash-flow-row {
   display: grid;
-  grid-template-columns: 130px 140px minmax(160px, 1fr) 38px;
+  grid-template-columns: 130px 140px minmax(160px, 1fr) 38px 38px;
   gap: 10px;
   align-items: center;
   border: 1px solid var(--line);
@@ -697,6 +697,74 @@ select:focus {
 
 .cash-flow-row small {
   color: var(--muted);
+}
+
+.real-return-panel {
+  overflow: hidden;
+}
+
+.return-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.return-grid article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 112px;
+}
+
+.return-grid article.positive-card {
+  border-color: #a9e7d0;
+  background: #eefaf5;
+}
+
+.return-grid article.negative-card {
+  border-color: #f3b8b0;
+  background: #fff0ee;
+}
+
+.return-grid span,
+.return-grid small,
+.return-breakdown span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.return-grid span {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+}
+
+.return-grid strong,
+.return-grid .trend-value {
+  font-size: 20px;
+}
+
+.return-breakdown {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+}
+
+.return-breakdown div {
+  padding: 14px 18px;
+  display: grid;
+  gap: 4px;
+  border-right: 1px solid var(--line);
+}
+
+.return-breakdown div:last-child {
+  border-right: 0;
 }
 
 .analytics-layout {
@@ -1096,6 +1164,16 @@ label {
   .cash-flow-form button {
     grid-column: 1 / -1;
   }
+
+  .return-grid,
+  .return-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .return-breakdown div {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
 }
 
 @media (max-width: 720px) {
@@ -1146,7 +1224,9 @@ label {
   }
 
   .cash-flow-form,
-  .cash-flow-row {
+  .cash-flow-row,
+  .return-grid,
+  .return-breakdown {
     grid-template-columns: 1fr;
   }
 

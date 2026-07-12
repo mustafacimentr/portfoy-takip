@@ -393,6 +393,7 @@ export default function Home() {
   const [historyRange, setHistoryRange] = useState<(typeof rangeOptions)[number]["key"]>("1m");
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
+  const [editingCashFlowId, setEditingCashFlowId] = useState("");
   const [lastSync, setLastSync] = useState("");
 
   useEffect(() => {
@@ -450,18 +451,33 @@ export default function Home() {
     const latest = historySeries[historySeries.length - 1];
     const periodChange = latest && first ? latest.totalValue - first.totalValue : 0;
     const rangeStart = first?.date || plainDate();
-    const netCashFlow = state.cashFlows
-      .map(normalizeCashFlow)
-      .filter((flow) => flow.date >= rangeStart)
-      .reduce((sum, flow) => sum + (flow.type === "deposit" ? flow.amount : -flow.amount), 0);
+    const periodFlows = state.cashFlows.map(normalizeCashFlow).filter((flow) => flow.date >= rangeStart);
+    const periodDeposits = periodFlows.filter((flow) => flow.type === "deposit").reduce((sum, flow) => sum + flow.amount, 0);
+    const periodWithdrawals = periodFlows.filter((flow) => flow.type === "withdrawal").reduce((sum, flow) => sum + flow.amount, 0);
+    const netCashFlow = periodDeposits - periodWithdrawals;
     const investmentGain = periodChange - netCashFlow;
+    const performanceBase = Math.max((first?.totalValue || 0) + periodDeposits, 1);
+    const realReturnRate = (investmentGain / performanceBase) * 100;
     const high = historySeries.reduce((max, item) => Math.max(max, item.totalValue), latest?.totalValue || 0);
     const low = historySeries.reduce((min, item) => Math.min(min, item.totalValue), latest?.totalValue || 0);
     const monthStart = `${plainDate().slice(0, 7)}-01`;
     const monthBase = [...historySeries].reverse().find((item) => item.date <= monthStart) || historySeries.find((item) => item.date >= monthStart) || first;
     const monthChange = latest && monthBase ? latest.totalValue - monthBase.totalValue : 0;
-    return { first, latest, periodChange, netCashFlow, investmentGain, high, low, monthChange };
+    return { first, latest, periodChange, periodDeposits, periodWithdrawals, netCashFlow, investmentGain, realReturnRate, high, low, monthChange };
   }, [historySeries, state.cashFlows]);
+
+  const cashFlowSummary = useMemo(() => {
+    const flows = state.cashFlows.map(normalizeCashFlow);
+    const totalDeposits = flows.filter((flow) => flow.type === "deposit").reduce((sum, flow) => sum + flow.amount, 0);
+    const totalWithdrawals = flows.filter((flow) => flow.type === "withdrawal").reduce((sum, flow) => sum + flow.amount, 0);
+    const netInvested = totalDeposits - totalWithdrawals;
+    const effectivePrincipal = netInvested > 0 ? netInvested : totals.totalCost;
+    const investmentProfit = totals.totalValue + totalWithdrawals - totalDeposits;
+    const fallbackProfit = totals.totalValue - totals.totalCost;
+    const realProfit = flows.length ? investmentProfit : fallbackProfit;
+    const realReturnRate = effectivePrincipal ? (realProfit / effectivePrincipal) * 100 : 0;
+    return { totalDeposits, totalWithdrawals, netInvested, effectivePrincipal, realProfit, realReturnRate, flowCount: flows.length };
+  }, [state.cashFlows, totals.totalCost, totals.totalValue]);
 
   const chartBounds = useMemo(() => {
     const values = historySeries.flatMap((item) => [item.totalValue, item.totalCost]);
@@ -932,18 +948,39 @@ export default function Home() {
       return;
     }
     const flow = normalizeCashFlow({
-      id: uid(),
+      id: editingCashFlowId || uid(),
       date: cashDraft.date,
       type: cashDraft.type,
       amount,
       note: cashDraft.note,
     });
-    await savePortfolio({ ...state, cashFlows: [...state.cashFlows, flow] });
+    const cashFlows = editingCashFlowId
+      ? state.cashFlows.map((item) => (item.id === editingCashFlowId ? flow : item))
+      : [...state.cashFlows, flow];
+    await savePortfolio({ ...state, cashFlows });
+    setCashDraft({ type: "deposit", amount: "", date: plainDate(), note: "" });
+    setEditingCashFlowId("");
+  }
+
+  function editCashFlow(flow: CashFlow) {
+    const normalized = normalizeCashFlow(flow);
+    setEditingCashFlowId(normalized.id);
+    setCashDraft({
+      type: normalized.type,
+      amount: String(normalized.amount).replace(".", ","),
+      date: normalized.date,
+      note: normalized.note,
+    });
+  }
+
+  function cancelCashFlowEdit() {
+    setEditingCashFlowId("");
     setCashDraft({ type: "deposit", amount: "", date: plainDate(), note: "" });
   }
 
   async function deleteCashFlow(id: string) {
     await savePortfolio({ ...state, cashFlows: state.cashFlows.filter((flow) => flow.id !== id) });
+    if (editingCashFlowId === id) cancelCashFlowEdit();
   }
 
   function chartPoints(key: "totalValue" | "totalCost") {
@@ -1141,9 +1178,45 @@ export default function Home() {
             <section className="insights-grid performance-kpis">
               <article className="insight-card"><span>Donem baslangici</span><strong>{money(performanceStats.first?.totalValue || totals.totalValue)}</strong></article>
               <article className={performanceStats.periodChange >= 0 ? "insight-card green" : "insight-card red"}><span>Donem degisimi</span><TrendValue trend={performanceStats.periodChange}>{signedMoney(performanceStats.periodChange)}</TrendValue></article>
-              <article className={performanceStats.investmentGain >= 0 ? "insight-card green" : "insight-card red"}><span>Yatirim getirisi</span><TrendValue trend={performanceStats.investmentGain}>{signedMoney(performanceStats.investmentGain)}</TrendValue></article>
+              <article className={performanceStats.investmentGain >= 0 ? "insight-card green" : "insight-card red"}><span>Yatirim getirisi</span><TrendValue trend={performanceStats.investmentGain}>{signedMoney(performanceStats.investmentGain)}</TrendValue><small>{signedPct(performanceStats.realReturnRate)}</small></article>
               <article className={performanceStats.netCashFlow >= 0 ? "insight-card green" : "insight-card red"}><span>Net nakit akisi</span><TrendValue trend={performanceStats.netCashFlow}>{signedMoney(performanceStats.netCashFlow)}</TrendValue></article>
               <article className={performanceStats.monthChange >= 0 ? "insight-card green" : "insight-card red"}><span>Bu ay</span><TrendValue trend={performanceStats.monthChange}>{signedMoney(performanceStats.monthChange)}</TrendValue></article>
+            </section>
+
+            <section className="panel real-return-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Gercek Getiri Hesabi</h2>
+                  <p>Para yatirma ve cekme hareketleri ayrilarak yatirimin kendi performansi hesaplanir.</p>
+                </div>
+              </div>
+              <div className="return-grid">
+                <article>
+                  <span>Toplam yatirilan para</span>
+                  <strong>{money(cashFlowSummary.totalDeposits)}</strong>
+                  <small>{cashFlowSummary.flowCount ? "Nakit akisi kayitlarindan" : "Henuz nakit kaydi yok"}</small>
+                </article>
+                <article>
+                  <span>Toplam cekilen para</span>
+                  <strong>{money(cashFlowSummary.totalWithdrawals)}</strong>
+                  <small>Portfoyden cikislar</small>
+                </article>
+                <article>
+                  <span>Net yatirilan ana para</span>
+                  <strong>{money(cashFlowSummary.effectivePrincipal)}</strong>
+                  <small>{cashFlowSummary.flowCount ? "Yatirilan eksi cekilen" : "Varlik maliyeti baz alindi"}</small>
+                </article>
+                <article className={cashFlowSummary.realProfit >= 0 ? "positive-card" : "negative-card"}>
+                  <span>Yatirimdan olusan net kazanc</span>
+                  <TrendValue trend={cashFlowSummary.realProfit}>{signedMoney(cashFlowSummary.realProfit)}</TrendValue>
+                  <small>{signedPct(cashFlowSummary.realReturnRate)}</small>
+                </article>
+              </div>
+              <div className="return-breakdown">
+                <div><span>Donem portfoy buyumesi</span><strong>{signedMoney(performanceStats.periodChange)}</strong></div>
+                <div><span>Donem nakit etkisi</span><strong>{signedMoney(performanceStats.netCashFlow)}</strong></div>
+                <div><span>Donem gercek yatirim getirisi</span><strong className={performanceStats.investmentGain >= 0 ? "positive" : "negative"}>{signedMoney(performanceStats.investmentGain)} · {signedPct(performanceStats.realReturnRate)}</strong></div>
+              </div>
             </section>
 
             <section className="panel visual-panel">
@@ -1200,7 +1273,8 @@ export default function Home() {
                   <input className="input" type="date" value={cashDraft.date} onChange={(event) => setCashDraft({ ...cashDraft, date: event.target.value })} />
                   <input className="input" value={cashDraft.amount} onChange={(event) => setCashDraft({ ...cashDraft, amount: event.target.value })} placeholder="Tutar" />
                   <input className="input" value={cashDraft.note} onChange={(event) => setCashDraft({ ...cashDraft, note: event.target.value })} placeholder="Not" />
-                  <button className="primary">Kaydet</button>
+                  <button className="primary">{editingCashFlowId ? "Guncelle" : "Kaydet"}</button>
+                  {editingCashFlowId ? <button type="button" className="secondary" onClick={cancelCashFlowEdit}>Vazgec</button> : null}
                 </form>
                 <div className="cash-flow-list">
                   {state.cashFlows.length ? [...state.cashFlows].map(normalizeCashFlow).sort((left, right) => right.date.localeCompare(left.date)).slice(0, 8).map((flow) => (
@@ -1208,7 +1282,8 @@ export default function Home() {
                       <span className={flow.type === "deposit" ? "positive" : "negative"}>{flow.type === "deposit" ? "Para yatirma" : "Para cekme"}</span>
                       <strong>{money(flow.amount)}</strong>
                       <small>{flow.date}{flow.note ? ` · ${flow.note}` : ""}</small>
-                      <button className="icon-btn" onClick={() => void deleteCashFlow(flow.id)} title="Sil">×</button>
+                      <button className="icon-btn" onClick={() => editCashFlow(flow)} title="Duzenle">D</button>
+                      <button className="icon-btn" onClick={() => void deleteCashFlow(flow.id)} title="Sil">x</button>
                     </div>
                   )) : <div className="empty">Henuz nakit akisi kaydi yok. Ilk kayit sonraki performans hesaplarini daha dogru yapar.</div>}
                 </div>

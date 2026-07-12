@@ -106,11 +106,15 @@ async function binancePrice(symbol: string) {
     }
   }
 
-  try {
-    return await coinGeckoTryPrice(finalSymbol);
-  } catch (error) {
-    throw new Error(`${lastError}; kripto yedek kaynak da okunamadi`);
+  for (const fallback of [cryptoCompareTryPrice, coinGeckoTryPrice, coinPaprikaTryPrice]) {
+    try {
+      return await fallback(finalSymbol);
+    } catch {
+      // Try the next public crypto source. Some providers block cloud egress.
+    }
   }
+
+  throw new Error(`${lastError}; kripto yedek kaynak da okunamadi`);
 }
 
 const coinGeckoIds: Record<string, string> = {
@@ -123,7 +127,25 @@ const coinGeckoIds: Record<string, string> = {
   ALGO: "algorand",
   SUI: "sui",
   XRP: "ripple",
-  NEAR: "near",
+  NEAR: "near-protocol",
+};
+
+const coinPaprikaIds: Record<string, string> = {
+  BTC: "btc-bitcoin",
+  ETH: "eth-ethereum",
+  LINK: "link-chainlink",
+  RNDR: "rndr-render-token",
+  RENDER: "rndr-render-token",
+  ONDO: "ondo-ondo-finance",
+  ALGO: "algo-algorand",
+  SUI: "sui-sui",
+  XRP: "xrp-xrp",
+  NEAR: "near-near-protocol",
+};
+
+const cryptoCompareSymbols: Record<string, string[]> = {
+  RNDR: ["RNDR", "RENDER"],
+  RENDER: ["RENDER", "RNDR"],
 };
 
 function cryptoBaseFromSymbol(symbol: string) {
@@ -144,6 +166,35 @@ async function coinGeckoTryPrice(symbol: string) {
   const price = Number(data[id]?.try);
   if (!Number.isFinite(price) || price <= 0) throw new Error("Kripto yedek fiyat okunamadi");
   return { price, source: "CoinGecko", symbol: `${base}TRY` };
+}
+
+async function cryptoCompareTryPrice(symbol: string) {
+  const base = cryptoBaseFromSymbol(symbol);
+  const candidates = cryptoCompareSymbols[base] || [base];
+  for (const candidate of candidates) {
+    const response = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${encodeURIComponent(candidate)}&tsyms=TRY`, {
+      headers: { "accept": "application/json", "user-agent": "Mozilla/5.0" },
+    });
+    if (!response.ok) continue;
+    const data = await response.json() as { TRY?: number; Response?: string };
+    const price = Number(data.TRY);
+    if (Number.isFinite(price) && price > 0) return { price, source: "CryptoCompare", symbol: `${candidate}TRY` };
+  }
+  throw new Error("CryptoCompare fiyati okunamadi");
+}
+
+async function coinPaprikaTryPrice(symbol: string) {
+  const base = cryptoBaseFromSymbol(symbol);
+  const id = coinPaprikaIds[base];
+  if (!id) throw new Error(`CoinPaprika'da ${base} tanimli degil`);
+  const response = await fetch(`https://api.coinpaprika.com/v1/tickers/${encodeURIComponent(id)}?quotes=TRY`, {
+    headers: { "accept": "application/json", "user-agent": "Mozilla/5.0" },
+  });
+  if (!response.ok) throw new Error(`CoinPaprika ${response.status}`);
+  const data = await response.json() as { quotes?: { TRY?: { price?: number } } };
+  const price = Number(data.quotes?.TRY?.price);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("CoinPaprika fiyati okunamadi");
+  return { price, source: "CoinPaprika", symbol: `${base}TRY` };
 }
 
 export async function GET(request: Request) {

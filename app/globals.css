@@ -363,6 +363,12 @@ th {
   font-size: 12px;
 }
 
+.group-pl {
+  font-size: 12px;
+  font-weight: 800;
+  margin-left: 2px;
+}
+
 .group-dot {
   width: 9px;
   height: 9px;

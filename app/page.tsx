@@ -267,7 +267,8 @@ export default function Home() {
             return rightValue - leftValue;
           });
         const value = assets.reduce((sum, asset) => sum + asset.quantity * asset.price * (asset.fxRate || 1), 0);
-        return { ...group, assets, value };
+        const cost = assets.reduce((sum, asset) => sum + asset.quantity * asset.avgCost * (asset.fxRate || 1), 0);
+        return { ...group, assets, value, cost, profitLoss: value - cost };
       })
       .filter((group) => group.assets.length > 0);
   }, [filteredAssets]);
@@ -736,7 +737,8 @@ export default function Home() {
                           <div className="group-title">
                             <span className="group-dot" style={{ background: colors[assetGroupIndex(asset) % colors.length] }} />
                             <strong>{group.label}</strong>
-                            <small>{group.assets.length} varlik · {money(group.value)}</small>
+                            <small>{group.assets.length} varlik · Yatirilan {money(group.cost)}</small>
+                            <span className={group.profitLoss >= 0 ? "group-pl positive" : "group-pl negative"}>{group.profitLoss >= 0 ? "+" : ""}{money(group.profitLoss)}</span>
                           </div>
                         </td>
                       </tr>

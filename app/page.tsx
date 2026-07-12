@@ -102,6 +102,9 @@ const cryptoLogoUrls: Record<string, string> = {
   XRP: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
   NEAR: "https://assets.coingecko.com/coins/images/10365/small/near.jpg",
 };
+const directAssetLogoUrls: Record<string, string> = {
+  ULKER: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/%C3%9Clker_logo_%282%29.svg/250px-%C3%9Clker_logo_%282%29.svg.png",
+};
 const assetLogoDomains: Record<string, string> = {
   ALTINS1: "darphane.gov.tr",
   ALTIN: "darphane.gov.tr",
@@ -145,6 +148,7 @@ function assetLogoUrl(asset: Asset) {
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
   if (cryptoBase && cryptoLogoUrls[cryptoBase]) return cryptoLogoUrls[cryptoBase];
+  if (directAssetLogoUrls[code]) return directAssetLogoUrls[code];
   const domain = assetLogoDomains[code] || assetLogoDomains[compactCode(asset.priceSymbol || "")];
   if (domain) return faviconUrl(domain);
   if (asset.priceSource === "isportfoy" || asset.priceSource === "tefas") return faviconUrl("isportfoy.com.tr");

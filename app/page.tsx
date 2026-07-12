@@ -461,6 +461,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof menuItems)[number]["key"]>("distribution");
   const [historyRange, setHistoryRange] = useState<(typeof rangeOptions)[number]["key"]>("1m");
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState("");
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
   const [lastSync, setLastSync] = useState("");
@@ -697,6 +698,40 @@ export default function Home() {
   const worstAsset = useMemo(() => {
     return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => left.returnRate - right.returnRate)[0];
   }, [portfolioRows]);
+
+  const selectedAssetDetail = useMemo(() => {
+    const asset = state.assets.find((item) => item.id === selectedAssetId);
+    if (!asset) return null;
+    const value = asset.quantity * asset.price * (asset.fxRate || 1);
+    const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
+    const profitLoss = value - cost;
+    const returnRate = cost ? (profitLoss / cost) * 100 : 0;
+    const groupKey = assetGroupKey(asset);
+    const group = groupDefinitions.find((item) => item.key === groupKey) || groupDefinitions[groupDefinitions.length - 1];
+    const groupValue = state.assets
+      .filter((item) => assetGroupKey(item) === groupKey)
+      .reduce((sum, item) => sum + item.quantity * item.price * (item.fxRate || 1), 0);
+    const portfolioShare = totals.totalValue ? (value / totals.totalValue) * 100 : 0;
+    const categoryShare = groupValue ? (value / groupValue) * 100 : 0;
+    const targetGap = (asset.target || 0) - portfolioShare;
+    const rank = portfolioRows.findIndex((row) => row.asset.id === asset.id) + 1;
+    const lastPriceDate = asset.lastPriceAt ? new Date(asset.lastPriceAt) : null;
+    const priceAgeHours = lastPriceDate ? (Date.now() - lastPriceDate.getTime()) / 3600000 : null;
+    const priceStatus = asset.lastPriceError
+      ? "Hata"
+      : priceAgeHours === null
+        ? "Kayit yok"
+        : priceAgeHours > 24
+          ? "Eski"
+          : "Guncel";
+    const notes = [
+      rank > 0 && rank <= 3 ? "Bu varlik portfoyun en buyuk 3 pozisyonundan biri." : "",
+      asset.target ? (targetGap >= 0 ? "Hedef payinin altinda; yeni yatirimlarda desteklenebilir." : "Hedef payinin uzerinde; agirligi izlenebilir.") : "Bu varlik icin hedef pay belirlenmemis.",
+      profitLoss >= 0 ? "Pozisyon karda gorunuyor." : "Pozisyon zararda gorunuyor.",
+      priceStatus === "Guncel" ? "Fiyat verisi guncel." : priceStatus === "Eski" ? "Fiyat verisi 24 saatten eski olabilir." : priceStatus === "Hata" ? "Fiyat kaynaginda hata kaydi var." : "Fiyat guncelleme kaydi yok.",
+    ].filter(Boolean);
+    return { asset, value, cost, profitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes };
+  }, [portfolioRows, selectedAssetId, state.assets, totals.totalValue]);
 
   const classGradient = useMemo(() => {
     let cursor = 0;
@@ -1032,7 +1067,12 @@ export default function Home() {
   }
 
   function openAsset(asset?: Asset) {
+    setSelectedAssetId("");
     setAssetDraft(asset ? { ...asset } : normalizeAsset({ ticker: "BTC/TRY", quantity: 0, avgCost: 0, price: 0 }));
+  }
+
+  function openAssetDetail(asset: Asset) {
+    setSelectedAssetId(asset.id);
   }
 
   function updateDraftTicker(value: string) {
@@ -1047,6 +1087,7 @@ export default function Home() {
       assets: state.assets.filter((asset) => asset.id !== id),
       transactions: state.transactions.filter((tx) => tx.assetId !== id),
     });
+    if (selectedAssetId === id) setSelectedAssetId("");
   }
 
   async function importBackup(file: File) {
@@ -1808,13 +1849,13 @@ export default function Home() {
                     ) : null}
                     <tr>
                       <td>
-                        <div className="asset-name">
+                        <button className="asset-name asset-detail-trigger" onClick={() => openAssetDetail(asset)} title="Varlik detayini ac">
                           <AssetLogo asset={asset} color={colors[index % colors.length]} small />
                           <div>
                             <strong>{asset.ticker}</strong>
                             <small>{asset.name} · {asset.priceSource} oto {asset.lastPriceAt ? `· ${formatTime(asset.lastPriceAt)}` : ""}{asset.lastPriceError ? ` · Hata: ${asset.lastPriceError}` : ""}</small>
                           </div>
-                        </div>
+                        </button>
                       </td>
                       <td>{num(asset.quantity)}</td>
                       <td>{money(cost)}</td>
@@ -1866,6 +1907,52 @@ export default function Home() {
               <button className="primary">Kaydet</button>
             </div>
           </form>
+        </div>
+      ) : null}
+
+      {selectedAssetDetail ? (
+        <div className="modal-backdrop">
+          <section className="modal asset-detail-modal">
+            <div className="asset-detail-head">
+              <div className="asset-detail-title">
+                <AssetLogo asset={selectedAssetDetail.asset} color={groupColors[assetGroupKey(selectedAssetDetail.asset)] || "#647181"} />
+                <div>
+                  <h2>{selectedAssetDetail.asset.ticker}</h2>
+                  <p>{selectedAssetDetail.asset.name} · {selectedAssetDetail.group.label}</p>
+                </div>
+              </div>
+              <div className="row-actions">
+                <button className="secondary" onClick={() => openAsset(selectedAssetDetail.asset)}>Duzenle</button>
+                <button className="secondary" onClick={() => setSelectedAssetId("")}>Kapat</button>
+              </div>
+            </div>
+
+            <div className="asset-detail-grid">
+              <article><span>Toplam adet</span><strong>{num(selectedAssetDetail.asset.quantity)}</strong></article>
+              <article><span>Ortalama maliyet</span><strong>{money(selectedAssetDetail.asset.avgCost, selectedAssetDetail.asset.currency)}</strong></article>
+              <article><span>Guncel fiyat</span><strong>{money(selectedAssetDetail.asset.price, selectedAssetDetail.asset.currency)}</strong></article>
+              <article><span>Toplam maliyet</span><strong>{money(selectedAssetDetail.cost)}</strong></article>
+              <article><span>Guncel deger</span><strong>{money(selectedAssetDetail.value)}</strong></article>
+              <article className={selectedAssetDetail.profitLoss >= 0 ? "positive-card" : "negative-card"}><span>Kar / zarar</span><TrendValue trend={selectedAssetDetail.profitLoss}>{signedMoney(selectedAssetDetail.profitLoss)}</TrendValue><small>{signedPct(selectedAssetDetail.returnRate)}</small></article>
+              <article><span>Portfoy payi</span><strong>{pct(selectedAssetDetail.portfolioShare)}</strong></article>
+              <article><span>Kategori ici pay</span><strong>{pct(selectedAssetDetail.categoryShare)}</strong></article>
+              <article><span>Hedef pay</span><strong>{selectedAssetDetail.asset.target ? pct(selectedAssetDetail.asset.target) : "-"}</strong><small>{selectedAssetDetail.asset.target ? `Fark ${signedPct(selectedAssetDetail.targetGap)}` : "Belirlenmedi"}</small></article>
+              <article><span>Fiyat kaynagi</span><strong>{selectedAssetDetail.asset.priceSource}</strong><small>{selectedAssetDetail.asset.priceSymbol}</small></article>
+              <article><span>Son guncelleme</span><strong>{selectedAssetDetail.asset.lastPriceAt ? formatTime(selectedAssetDetail.asset.lastPriceAt) : "-"}</strong><small>{selectedAssetDetail.priceStatus}</small></article>
+              <article><span>Pozisyon sirasi</span><strong>{selectedAssetDetail.rank || "-"}</strong><small>Degere gore</small></article>
+            </div>
+
+            <div className="asset-detail-body">
+              <section className="asset-detail-notes">
+                <h3>Analiz notlari</h3>
+                {selectedAssetDetail.notes.map((note) => <p key={note}>{note}</p>)}
+              </section>
+              <section className="asset-detail-note-box">
+                <h3>Kisisel not</h3>
+                <p>{selectedAssetDetail.asset.note || "Bu varlik icin not eklenmemis."}</p>
+              </section>
+            </div>
+          </section>
         </div>
       ) : null}
     </div>

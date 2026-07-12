@@ -276,8 +276,7 @@ export default function Home() {
       state.assets.map(async (asset) => {
         if (!asset.autoUpdate || asset.priceSource === "manual") return asset;
         try {
-          const url = `/api/price?source=${encodeURIComponent(asset.priceSource)}&symbol=${encodeURIComponent(asset.priceSymbol || asset.ticker)}`;
-          const result = await api<{ price: number }>(url, passcode);
+          const result = await fetchPrice(asset);
           return { ...asset, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
         } catch (error) {
           return { ...asset, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
@@ -294,10 +293,7 @@ export default function Home() {
     let asset = normalizeAsset(assetDraft);
     if (asset.autoUpdate && asset.priceSource !== "manual") {
       try {
-        const result = await api<{ price: number }>(
-          `/api/price?source=${encodeURIComponent(asset.priceSource)}&symbol=${encodeURIComponent(asset.priceSymbol)}`,
-          passcode,
-        );
+        const result = await fetchPrice(asset);
         asset = { ...asset, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
       } catch (error) {
         asset = { ...asset, price: asset.price || asset.avgCost, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
@@ -307,6 +303,128 @@ export default function Home() {
     const assets = exists ? state.assets.map((item) => (item.id === asset.id ? asset : item)) : [...state.assets, asset];
     await savePortfolio({ ...state, assets });
     setAssetDraft(null);
+  }
+
+  async function fetchPrice(asset: Asset) {
+    const source = asset.priceSource;
+    const symbol = asset.priceSymbol || asset.ticker;
+    if (source === "binance" || asset.type === "Kripto") {
+      return fetchBrowserCryptoPrice(symbol || asset.ticker);
+    }
+    const url = `/api/price?source=${encodeURIComponent(source)}&symbol=${encodeURIComponent(symbol)}`;
+    return api<{ price: number }>(url, passcode);
+  }
+
+  async function fetchBrowserCryptoPrice(symbol: string) {
+    const finalSymbol = normalizeCryptoSymbol(symbol);
+    const binanceEndpoints = [
+      "https://api.binance.com",
+      "https://api1.binance.com",
+      "https://api2.binance.com",
+      "https://api3.binance.com",
+      "https://data-api.binance.vision",
+    ];
+    let lastError = "Kripto fiyati alinamadi";
+
+    for (const endpoint of binanceEndpoints) {
+      try {
+        const response = await fetch(`${endpoint}/api/v3/ticker/price?symbol=${encodeURIComponent(finalSymbol)}`, { cache: "no-store" });
+        if (!response.ok) {
+          lastError = `Binance ${response.status}`;
+          continue;
+        }
+        const data = await response.json() as { price?: string };
+        const price = Number(data.price);
+        if (Number.isFinite(price) && price > 0) return { price };
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : lastError;
+      }
+    }
+
+    for (const fallback of [fetchCryptoCompareTryPrice, fetchCoinPaprikaTryPrice, fetchCoinGeckoTryPrice]) {
+      try {
+        return await fallback(finalSymbol);
+      } catch {
+        // Keep going until one public crypto source works from the browser.
+      }
+    }
+    throw new Error(`${lastError}; tarayici yedek kaynaklari da okunamadi`);
+  }
+
+  function normalizeCryptoSymbol(symbol: string) {
+    const compact = compactCode(symbol);
+    if (compact === "RNDRTRY") return "RENDERTRY";
+    if (["TRY", "USDT", "USD", "EUR"].some((suffix) => compact.endsWith(suffix))) return compact;
+    return `${compact}TRY`;
+  }
+
+  function cryptoBaseFromSymbol(symbol: string) {
+    const compact = compactCode(symbol);
+    const quote = ["TRY", "USDT", "USD", "EUR"].find((suffix) => compact.endsWith(suffix));
+    return quote ? compact.slice(0, -quote.length) : compact;
+  }
+
+  async function fetchCryptoCompareTryPrice(symbol: string) {
+    const base = cryptoBaseFromSymbol(symbol);
+    const candidates = base === "RENDER" ? ["RENDER", "RNDR"] : base === "RNDR" ? ["RNDR", "RENDER"] : [base];
+    for (const candidate of candidates) {
+      const response = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${encodeURIComponent(candidate)}&tsyms=TRY`, { cache: "no-store" });
+      if (!response.ok) continue;
+      const data = await response.json() as { TRY?: number };
+      const price = Number(data.TRY);
+      if (Number.isFinite(price) && price > 0) return { price };
+    }
+    throw new Error("CryptoCompare fiyati okunamadi");
+  }
+
+  const coinPaprikaIds: Record<string, string> = {
+    BTC: "btc-bitcoin",
+    ETH: "eth-ethereum",
+    LINK: "link-chainlink",
+    RNDR: "rndr-render-token",
+    RENDER: "rndr-render-token",
+    ONDO: "ondo-ondo-finance",
+    ALGO: "algo-algorand",
+    SUI: "sui-sui",
+    XRP: "xrp-xrp",
+    NEAR: "near-near-protocol",
+  };
+
+  async function fetchCoinPaprikaTryPrice(symbol: string) {
+    const base = cryptoBaseFromSymbol(symbol);
+    const id = coinPaprikaIds[base];
+    if (!id) throw new Error("CoinPaprika sembolu yok");
+    const response = await fetch(`https://api.coinpaprika.com/v1/tickers/${encodeURIComponent(id)}?quotes=TRY`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`CoinPaprika ${response.status}`);
+    const data = await response.json() as { quotes?: { TRY?: { price?: number } } };
+    const price = Number(data.quotes?.TRY?.price);
+    if (!Number.isFinite(price) || price <= 0) throw new Error("CoinPaprika fiyati okunamadi");
+    return { price };
+  }
+
+  const coinGeckoIds: Record<string, string> = {
+    BTC: "bitcoin",
+    ETH: "ethereum",
+    LINK: "chainlink",
+    RNDR: "render-token",
+    RENDER: "render-token",
+    ONDO: "ondo-finance",
+    ALGO: "algorand",
+    SUI: "sui",
+    XRP: "ripple",
+    NEAR: "near-protocol",
+  };
+
+  async function fetchCoinGeckoTryPrice(symbol: string) {
+    const base = cryptoBaseFromSymbol(symbol);
+    const id = coinGeckoIds[base];
+    if (!id) throw new Error("CoinGecko sembolu yok");
+    const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=try`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`CoinGecko ${response.status}`);
+    const data = await response.json() as Record<string, { try?: number }>;
+    const price = Number(data[id]?.try);
+    if (!Number.isFinite(price) || price <= 0) throw new Error("CoinGecko fiyati okunamadi");
+    return { price };
   }
 
   function openAsset(asset?: Asset) {

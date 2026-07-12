@@ -767,6 +767,108 @@ select:focus {
   border-right: 0;
 }
 
+.target-kpis .insight-card strong {
+  font-size: 20px;
+}
+
+.targets-panel,
+.rebalance-panel {
+  overflow: hidden;
+}
+
+.target-settings-grid {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.target-input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 12px;
+}
+
+.target-input span,
+.target-label,
+.rebalance-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.target-input i,
+.target-label i,
+.rebalance-row i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.target-table-wrap {
+  overflow-x: auto;
+}
+
+.target-table {
+  min-width: 820px;
+}
+
+.target-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.target-status.balanced {
+  background: #eef4ff;
+  color: #193a6a;
+}
+
+.target-status.missing {
+  background: #fff6d8;
+  color: #9a6a00;
+}
+
+.target-status.over {
+  background: #fde6e3;
+  color: var(--red);
+}
+
+.rebalance-amount {
+  width: 220px;
+}
+
+.rebalance-list {
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.rebalance-row {
+  display: grid;
+  grid-template-columns: 180px minmax(160px, 1fr) 130px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfd;
+  font-size: 13px;
+}
+
+.rebalance-row strong {
+  text-align: right;
+}
+
 .analytics-layout {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
@@ -1166,7 +1268,8 @@ label {
   }
 
   .return-grid,
-  .return-breakdown {
+  .return-breakdown,
+  .target-settings-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1226,8 +1329,18 @@ label {
   .cash-flow-form,
   .cash-flow-row,
   .return-grid,
-  .return-breakdown {
+  .return-breakdown,
+  .target-settings-grid,
+  .rebalance-row {
     grid-template-columns: 1fr;
+  }
+
+  .rebalance-amount {
+    width: 100%;
+  }
+
+  .rebalance-row strong {
+    text-align: left;
   }
 
   .risk-head {

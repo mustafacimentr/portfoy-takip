@@ -51,12 +51,34 @@ type CashFlow = {
   note: string;
 };
 
+type PortfolioSettings = {
+  autoRefresh: boolean;
+  targetAllocations: Record<string, number>;
+  rebalanceAmount: number;
+};
+
 type PortfolioState = {
   assets: Asset[];
   transactions: Transaction[];
   history: PortfolioSnapshot[];
   cashFlows: CashFlow[];
-  settings: { autoRefresh: boolean };
+  settings: PortfolioSettings;
+};
+
+const defaultTargetAllocations: Record<string, number> = {
+  precious: 25,
+  fund: 35,
+  Hisse: 25,
+  Kripto: 10,
+  Doviz: 0,
+  Nakit: 5,
+  Diger: 0,
+};
+
+const defaultSettings: PortfolioSettings = {
+  autoRefresh: true,
+  targetAllocations: defaultTargetAllocations,
+  rebalanceAmount: 50000,
 };
 
 const emptyState: PortfolioState = {
@@ -64,7 +86,7 @@ const emptyState: PortfolioState = {
   transactions: [],
   history: [],
   cashFlows: [],
-  settings: { autoRefresh: true },
+  settings: defaultSettings,
 };
 
 const knownNames: Record<string, { name: string; type?: string; source?: string; symbol?: string }> = {
@@ -90,6 +112,7 @@ const types = ["Hisse", "Fon", "Kripto", "Doviz", "Altin", "Nakit", "Diger"];
 const menuItems = [
   { key: "distribution", label: "Portfoy Dagilimi", description: "Varlik sinifi, toplam paylar ve mevcut varlik listen." },
   { key: "performance", label: "Performans Gecmisi", description: "Portfoy degerinin zaman icindeki degisimi ve nakit akisi." },
+  { key: "targets", label: "Hedef Portfoy", description: "Hedef oranlar, sapmalar ve yeni yatirim dagitim onerisi." },
   { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
   { key: "analytics", label: "Portfoy Analitigi", description: "Sinif dengesi, en iyi ve en zayif performanslar." },
   { key: "risk", label: "Risk & Cesitlilik Notu", description: "Yogunlasma, cesitlilik ve stratejik denge ozeti." },
@@ -282,6 +305,20 @@ function normalizeCashFlow(flow: Partial<CashFlow>): CashFlow {
     type: flow.type === "withdrawal" ? "withdrawal" : "deposit",
     amount: Number(flow.amount || 0),
     note: flow.note || "",
+  };
+}
+
+function normalizeSettings(settings?: Partial<PortfolioSettings> & { autoRefresh?: boolean }): PortfolioSettings {
+  const incomingTargets = settings?.targetAllocations || {};
+  return {
+    autoRefresh: settings?.autoRefresh !== false,
+    rebalanceAmount: Number(settings?.rebalanceAmount || defaultSettings.rebalanceAmount),
+    targetAllocations: Object.fromEntries(
+      groupDefinitions.map((group) => [
+        group.key,
+        Math.max(0, Number(incomingTargets[group.key] ?? defaultTargetAllocations[group.key] ?? 0)),
+      ]),
+    ),
   };
 }
 
@@ -521,6 +558,43 @@ export default function Home() {
       .filter((group) => group.assets.length > 0);
   }, [filteredAssets]);
 
+  const targetRows = useMemo(() => {
+    const targets = normalizeSettings(state.settings).targetAllocations;
+    return groupDefinitions.map((group) => {
+      const value = state.assets
+        .filter((asset) => assetGroupKey(asset) === group.key)
+        .reduce((sum, asset) => sum + asset.quantity * asset.price * (asset.fxRate || 1), 0);
+      const currentShare = totals.totalValue ? (value / totals.totalValue) * 100 : 0;
+      const targetShare = targets[group.key] || 0;
+      const targetValue = (totals.totalValue * targetShare) / 100;
+      const gapValue = targetValue - value;
+      const gapShare = targetShare - currentShare;
+      const status = Math.abs(gapShare) <= 1 ? "balanced" : gapShare > 0 ? "missing" : "over";
+      return { ...group, value, currentShare, targetShare, targetValue, gapValue, gapShare, status };
+    });
+  }, [state.assets, state.settings, totals.totalValue]);
+
+  const targetTotal = targetRows.reduce((sum, row) => sum + row.targetShare, 0);
+
+  const rebalanceSuggestions = useMemo(() => {
+    const amount = Math.max(0, Number(state.settings.rebalanceAmount || 0));
+    const positiveGaps = targetRows.filter((row) => row.targetShare > 0 && row.gapValue > 0);
+    const totalGap = positiveGaps.reduce((sum, row) => sum + row.gapValue, 0);
+    if (!amount || !totalGap) return targetRows.map((row) => ({ ...row, suggestedAmount: 0 }));
+    return targetRows.map((row) => ({
+      ...row,
+      suggestedAmount: row.gapValue > 0 ? (amount * row.gapValue) / totalGap : 0,
+    }));
+  }, [state.settings.rebalanceAmount, targetRows]);
+
+  const rebalanceHealth = useMemo(() => {
+    const maxDeviation = targetRows.reduce((max, row) => Math.max(max, Math.abs(row.gapShare)), 0);
+    const missingCount = targetRows.filter((row) => row.status === "missing").length;
+    const overCount = targetRows.filter((row) => row.status === "over").length;
+    const score = Math.max(0, Math.min(100, 100 - maxDeviation * 3.2 - (missingCount + overCount) * 2));
+    return { maxDeviation, missingCount, overCount, score };
+  }, [targetRows]);
+
   const portfolioRows = useMemo(() => {
     return state.assets
       .map((asset) => {
@@ -621,14 +695,16 @@ export default function Home() {
       transactions: data.state.transactions || [],
       history: (data.state.history || []).map(normalizeSnapshot),
       cashFlows: (data.state.cashFlows || []).map(normalizeCashFlow),
-      settings: data.state.settings || { autoRefresh: true },
+      settings: normalizeSettings(data.state.settings),
     });
     setLastSync(new Date().toISOString());
   }
 
   function withTodaySnapshot(nextState: PortfolioState) {
     const calculated = totalsFromAssets(nextState.assets);
-    if (!nextState.assets.length) return { ...nextState, history: nextState.history || [], cashFlows: nextState.cashFlows || [] };
+    if (!nextState.assets.length) {
+      return { ...nextState, history: nextState.history || [], cashFlows: nextState.cashFlows || [], settings: normalizeSettings(nextState.settings) };
+    }
     const today = plainDate();
     const snapshot = normalizeSnapshot({
       id: `snapshot-${today}`,
@@ -642,7 +718,7 @@ export default function Home() {
     const history = [...(nextState.history || []).map(normalizeSnapshot).filter((item) => item.date !== today), snapshot]
       .sort((left, right) => left.date.localeCompare(right.date))
       .slice(-730);
-    return { ...nextState, history, cashFlows: (nextState.cashFlows || []).map(normalizeCashFlow) };
+    return { ...nextState, history, cashFlows: (nextState.cashFlows || []).map(normalizeCashFlow), settings: normalizeSettings(nextState.settings) };
   }
 
   async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean } = {}) {
@@ -857,7 +933,7 @@ export default function Home() {
       transactions: data.transactions || [],
       history: (data.history || []).map(normalizeSnapshot),
       cashFlows: (data.cashFlows || []).map(normalizeCashFlow),
-      settings: data.settings || { autoRefresh: true },
+      settings: normalizeSettings(data.settings),
     };
   }
 
@@ -889,7 +965,7 @@ export default function Home() {
     }).filter((asset) => asset.ticker && asset.quantity > 0);
 
     if (!assets.length) throw new Error("CSV dosyasinda aktarilacak varlik bulunamadi");
-    return { assets, transactions: [], history: [], cashFlows: [], settings: { autoRefresh: true } };
+    return { assets, transactions: [], history: [], cashFlows: [], settings: defaultSettings };
   }
 
   function normalizeHeader(value: string) {
@@ -981,6 +1057,34 @@ export default function Home() {
   async function deleteCashFlow(id: string) {
     await savePortfolio({ ...state, cashFlows: state.cashFlows.filter((flow) => flow.id !== id) });
     if (editingCashFlowId === id) cancelCashFlowEdit();
+  }
+
+  async function updateTargetAllocation(groupKey: string, value: string) {
+    const amount = Math.max(0, parseAmount(value));
+    const settings = normalizeSettings(state.settings);
+    await savePortfolio({
+      ...state,
+      settings: {
+        ...settings,
+        targetAllocations: { ...settings.targetAllocations, [groupKey]: amount },
+      },
+    }, { snapshot: false });
+  }
+
+  async function updateRebalanceAmount(value: string) {
+    const settings = normalizeSettings(state.settings);
+    await savePortfolio({
+      ...state,
+      settings: { ...settings, rebalanceAmount: Math.max(0, parseAmount(value)) },
+    }, { snapshot: false });
+  }
+
+  async function resetTargetAllocations() {
+    const settings = normalizeSettings(state.settings);
+    await savePortfolio({
+      ...state,
+      settings: { ...settings, targetAllocations: defaultTargetAllocations },
+    }, { snapshot: false });
   }
 
   function chartPoints(key: "totalValue" | "totalCost") {
@@ -1287,6 +1391,93 @@ export default function Home() {
                     </div>
                   )) : <div className="empty">Henuz nakit akisi kaydi yok. Ilk kayit sonraki performans hesaplarini daha dogru yapar.</div>}
                 </div>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "targets" ? (
+          <>
+            <section className="insights-grid target-kpis">
+              <article className="insight-card"><span>Hedef toplam</span><strong className={Math.abs(targetTotal - 100) <= 0.01 ? "positive" : "negative"}>{pct(targetTotal)}</strong><small>Ideal toplam %100</small></article>
+              <article className={rebalanceHealth.score >= 75 ? "insight-card green" : rebalanceHealth.score >= 55 ? "insight-card gold" : "insight-card red"}><span>Denge skoru</span><strong>{rebalanceHealth.score.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}/100</strong><small>Hedefe yakinlik</small></article>
+              <article className={rebalanceHealth.missingCount ? "insight-card red" : "insight-card green"}><span>Eksik sinif</span><strong>{rebalanceHealth.missingCount}</strong><small>Hedefin altinda</small></article>
+              <article className={rebalanceHealth.overCount ? "insight-card red" : "insight-card green"}><span>Fazla sinif</span><strong>{rebalanceHealth.overCount}</strong><small>Hedefin ustunde</small></article>
+              <article className="insight-card"><span>En buyuk sapma</span><strong>{pct(rebalanceHealth.maxDeviation)}</strong><small>Mutlak fark</small></article>
+            </section>
+
+            <section className="panel targets-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Hedef Portfoy Dagilimi</h2>
+                  <p>Varlik siniflari icin hedef oran belirle; uygulama mevcut dagilimla farki hesaplasin.</p>
+                </div>
+                <button className="secondary" onClick={() => void resetTargetAllocations()}>Varsayilana don</button>
+              </div>
+              <div className="target-settings-grid">
+                {targetRows.map((row) => (
+                  <label className="target-input" key={row.key}>
+                    <span><i style={{ background: groupColors[row.key] || "#647181" }} />{row.label}</span>
+                    <input
+                      className="input"
+                      value={row.targetShare || ""}
+                      onChange={(event) => void updateTargetAllocation(row.key, event.target.value)}
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel visual-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Mevcut / Hedef Karsilastirma</h2>
+                  <p>Eksik, fazla ve dengeli siniflari tek tabloda gosterir.</p>
+                </div>
+              </div>
+              <div className="target-table-wrap">
+                <table className="target-table">
+                  <thead>
+                    <tr><th>Sinif</th><th>Mevcut</th><th>Hedef</th><th>Fark</th><th>Tutar Farki</th><th>Durum</th></tr>
+                  </thead>
+                  <tbody>
+                    {targetRows.map((row) => (
+                      <tr key={row.key}>
+                        <td><span className="target-label"><i style={{ background: groupColors[row.key] || "#647181" }} />{row.label}</span></td>
+                        <td>{pct(row.currentShare)}</td>
+                        <td>{pct(row.targetShare)}</td>
+                        <td className={row.gapShare >= 0 ? "positive" : "negative"}>{signedPct(row.gapShare)}</td>
+                        <td className={row.gapValue >= 0 ? "positive" : "negative"}>{signedMoney(row.gapValue)}</td>
+                        <td><span className={`target-status ${row.status}`}>{row.status === "balanced" ? "Dengeli" : row.status === "missing" ? "Eksik" : "Fazla"}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="panel rebalance-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Yeni Yatirim Dagitim Onerisi</h2>
+                  <p>Girecegin yeni yatirim tutarini hedefe en uzak eksik siniflara dagitir.</p>
+                </div>
+                <label className="rebalance-amount">Yeni yatirim tutari
+                  <input
+                    className="input"
+                    value={state.settings.rebalanceAmount || ""}
+                    onChange={(event) => void updateRebalanceAmount(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="rebalance-list">
+                {rebalanceSuggestions.filter((row) => row.suggestedAmount > 0).length ? rebalanceSuggestions.filter((row) => row.suggestedAmount > 0).map((row) => (
+                  <div className="rebalance-row" key={row.key}>
+                    <span><i style={{ background: groupColors[row.key] || "#647181" }} />{row.label}</span>
+                    <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(3, (row.suggestedAmount / Math.max(state.settings.rebalanceAmount || 1, 1)) * 100)}%`, background: groupColors[row.key] || "#647181" }} /></div>
+                    <strong>{money(row.suggestedAmount)}</strong>
+                  </div>
+                )) : <div className="empty">Hedefe gore eksik sinif yok. Yeni yatirim icin portfoy zaten dengeli gorunuyor.</div>}
               </div>
             </section>
           </>

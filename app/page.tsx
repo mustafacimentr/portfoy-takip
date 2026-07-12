@@ -64,6 +64,12 @@ const knownNames: Record<string, { name: string; type?: string; source?: string;
 };
 
 const types = ["Hisse", "Fon", "Kripto", "Doviz", "Altin", "Nakit", "Diger"];
+const menuItems = [
+  { key: "distribution", label: "Portfoy Dagilimi", description: "Varlik sinifi, toplam paylar ve mevcut varlik listen." },
+  { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
+  { key: "analytics", label: "Portfoy Analitigi", description: "Sinif dengesi, en iyi ve en zayif performanslar." },
+  { key: "risk", label: "Risk & Cesitlilik Notu", description: "Yogunlasma, cesitlilik ve stratejik denge ozeti." },
+] as const;
 const groupDefinitions = [
   { key: "precious", label: "Degerli Madenler" },
   { key: "fund", label: "Yatirim Fonlari" },
@@ -74,6 +80,15 @@ const groupDefinitions = [
   { key: "Diger", label: "Diger" },
 ];
 const colors = ["#2f6fed", "#12805c", "#bc3d32", "#7557d6", "#c77d0e", "#0f8b8d", "#596579"];
+const groupColors: Record<string, string> = {
+  precious: "#d19a18",
+  fund: "#3f7f8f",
+  Hisse: "#193a6a",
+  Kripto: "#18b884",
+  Doviz: "#596579",
+  Nakit: "#6b7280",
+  Diger: "#7557d6",
+};
 const preciousCodes = new Set(["ALTINS1", "ALTIN", "GMSTRF", "GMSTR"]);
 const fundCodes = new Set(["TGE", "TMG", "KPH"]);
 
@@ -110,6 +125,17 @@ function num(value: number) {
 
 function pct(value: number) {
   return `%${Number(value || 0).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
+}
+
+function signedMoney(value: number) {
+  return `${value >= 0 ? "+" : ""}${money(value)}`;
+}
+
+function compactMoney(value: number) {
+  if (Math.abs(value) >= 1000000) {
+    return `${(value / 1000000).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} M TL`;
+  }
+  return money(value);
 }
 
 function formatTime(value?: string) {
@@ -205,6 +231,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState<(typeof menuItems)[number]["key"]>("distribution");
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
   const [lastSync, setLastSync] = useState("");
 
@@ -272,6 +299,75 @@ export default function Home() {
       })
       .filter((group) => group.assets.length > 0);
   }, [filteredAssets]);
+
+  const portfolioRows = useMemo(() => {
+    return state.assets
+      .map((asset) => {
+        const value = asset.quantity * asset.price * (asset.fxRate || 1);
+        const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
+        const code = compactCode(asset.ticker).slice(0, 2) || "PF";
+        const groupKey = assetGroupKey(asset);
+        return {
+          asset,
+          value,
+          cost,
+          profitLoss: value - cost,
+          returnRate: cost ? ((value - cost) / cost) * 100 : 0,
+          share: totals.totalValue ? (value / totals.totalValue) * 100 : 0,
+          initials: code,
+          color: groupColors[groupKey] || colors[assetGroupIndex(asset) % colors.length],
+        };
+      })
+      .sort((left, right) => right.value - left.value);
+  }, [state.assets, totals.totalValue]);
+
+  const bestAsset = useMemo(() => {
+    return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => right.returnRate - left.returnRate)[0];
+  }, [portfolioRows]);
+
+  const worstAsset = useMemo(() => {
+    return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => left.returnRate - right.returnRate)[0];
+  }, [portfolioRows]);
+
+  const classGradient = useMemo(() => {
+    let cursor = 0;
+    const segments = groupedAssets.map((group) => {
+      const share = totals.totalValue ? (group.value / totals.totalValue) * 100 : 0;
+      const start = cursor;
+      cursor += share;
+      return `${groupColors[group.key] || "#647181"} ${start}% ${cursor}%`;
+    });
+    return segments.length ? `linear-gradient(90deg, ${segments.join(", ")})` : "#edf1f5";
+  }, [groupedAssets, totals.totalValue]);
+
+  const donutGradient = useMemo(() => {
+    let cursor = 0;
+    const segments = groupedAssets.map((group) => {
+      const share = totals.totalValue ? (group.value / totals.totalValue) * 100 : 0;
+      const start = cursor;
+      cursor += share;
+      return `${groupColors[group.key] || "#647181"} ${start}% ${cursor}%`;
+    });
+    return segments.length ? `conic-gradient(${segments.join(", ")})` : "#edf1f5";
+  }, [groupedAssets, totals.totalValue]);
+
+  const projections = useMemo(() => {
+    const annualContribution = 360000;
+    const annualReturn = 0.16;
+    const years = [1, 2, 3, 4, 5, 6, 10];
+    return years.map((year) => {
+      const growth = Math.pow(1 + annualReturn, year);
+      const contributionGrowth = annualContribution * ((growth - 1) / annualReturn);
+      return { year, value: totals.totalValue * growth + contributionGrowth };
+    });
+  }, [totals.totalValue]);
+
+  const maxProjection = Math.max(...projections.map((item) => item.value), 1);
+  const activeMenu = menuItems.find((item) => item.key === activeTab) || menuItems[0];
+  const topShare = portfolioRows[0]?.share || 0;
+  const activeGroupCount = groupedAssets.length;
+  const riskScore = Math.max(1, Math.min(10, 10 - topShare / 18 + activeGroupCount * 0.25));
+  const diversityScore = Math.max(1, Math.min(10, activeGroupCount * 1.55 + Math.min(2.4, portfolioRows.length / 8) - topShare / 35));
 
   async function login(code = draftPasscode) {
     setAuthError("");
@@ -661,6 +757,17 @@ export default function Home() {
             <span>Kisisel bulut paneli</span>
           </div>
         </div>
+        <nav className="side-menu" aria-label="Portfoy bolumleri">
+          {menuItems.map((item) => (
+            <button
+              key={item.key}
+              className={activeTab === item.key ? "active" : ""}
+              onClick={() => setActiveTab(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
         <div className="side-note">
           Bu surum lokal dosyadan ayridir. Veriler sifreli erisimle bulutta saklanir; mevcut bilgisayar surumun korunur.
         </div>
@@ -669,8 +776,8 @@ export default function Home() {
       <main className="dashboard">
         <section className="topbar">
           <div>
-            <h1>Genel Bakis</h1>
-            <p>Portfoyunun toplam degeri, dagilimi ve otomatik fiyat durumu.</p>
+            <h1>{activeMenu.label}</h1>
+            <p>{activeMenu.description}</p>
             <div className="status-line">
               <span className="status-pill"><span className={`pulse ${failures ? "error" : active ? "" : "off"}`} />{active} kaynak aktif, {failures} hata</span>
               <span>{lastSync ? `Son kayit ${formatTime(lastSync)}` : "Kayit bekliyor"}</span>
@@ -701,7 +808,133 @@ export default function Home() {
           <article className="card"><span>Nakit</span><strong>{money(totals.cash)}</strong><small>Varlik tipi: Nakit</small></article>
         </section>
 
-        <section className="panel">
+        {activeTab === "distribution" ? (
+          <section className="insights-grid">
+            <article className="insight-card gold"><span>Yatirilan ana para</span><strong>{money(totals.totalCost)}</strong></article>
+            <article className="insight-card"><span>Varlik degeri</span><strong>{money(totals.totalValue)}</strong></article>
+            <article className={totals.pl >= 0 ? "insight-card green" : "insight-card red"}><span>Net durum</span><strong>{signedMoney(totals.pl)}</strong><small>{pct(totals.rate)}</small></article>
+            <article className="insight-card green"><span>En iyi performans</span><strong>{bestAsset?.asset.ticker || "-"}</strong><small>{bestAsset ? pct(bestAsset.returnRate) : "%0"}</small></article>
+            <article className="insight-card red"><span>En zayif performans</span><strong>{worstAsset?.asset.ticker || "-"}</strong><small>{worstAsset ? pct(worstAsset.returnRate) : "%0"}</small></article>
+          </section>
+        ) : null}
+
+        {activeTab === "distribution" ? (
+          <section className="panel visual-panel">
+            <div className="panel-header compact">
+              <div>
+                <h2>Varlik Sinifi Dagilimi</h2>
+                <p>Guncel portfoy degerine gore sinif paylari.</p>
+              </div>
+            </div>
+            <div className="visual-body">
+              <div className="class-stack" style={{ background: classGradient }} />
+              <div className="legend-grid">
+                {groupedAssets.map((group) => (
+                  <div key={group.key} className="legend-item">
+                    <span style={{ background: groupColors[group.key] || "#647181" }} />
+                    <strong>{group.label}</strong>
+                    <b>{pct(totals.totalValue ? (group.value / totals.totalValue) * 100 : 0)}</b>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "distribution" ? (
+          <section className="panel visual-panel">
+            <div className="panel-header compact">
+              <div>
+                <h2>Genel Portfoy Dagilimi</h2>
+                <p>Varlik bazinda portfoy payi ve guncel deger.</p>
+              </div>
+            </div>
+            <div className="portfolio-bars">
+              {portfolioRows.map((row) => (
+                <div className="portfolio-bar-row" key={row.asset.id}>
+                  <div className="avatar" style={{ background: row.color }}>{row.initials}</div>
+                  <strong>{row.asset.ticker}</strong>
+                  <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, row.share)}%`, background: row.color }} /></div>
+                  <span>{pct(row.share)}</span>
+                  <b>{money(row.value)}</b>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "projection" ? (
+          <section className="panel visual-panel">
+            <div className="panel-header compact">
+              <div>
+                <h2>Uzun Vadeli Gelecek Projeksiyonu</h2>
+                <p>Bugunku deger uzerine her yil 360.000 TL ek yatirim ve yillik %16 bilesik getiri varsayimi.</p>
+              </div>
+            </div>
+            <div className="projection-list">
+              {projections.map((item) => (
+                <div className="projection-row" key={item.year}>
+                  <span>{item.year}. Yil</span>
+                  <div className="bar-track"><div className={item.year === 10 ? "bar-fill accent" : "bar-fill"} style={{ width: `${(item.value / maxProjection) * 100}%` }} /></div>
+                  <strong>{compactMoney(item.value)}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "analytics" ? (
+          <section className="panel visual-panel">
+            <div className="panel-header compact">
+              <div>
+                <h2>Portfoy Analitigi</h2>
+                <p>Sinif dengesi, kategori paylari ve performans ozeti.</p>
+              </div>
+            </div>
+            <div className="analytics-layout">
+              <div className="donut-wrap">
+                <div className="donut" style={{ background: donutGradient }}><span>Varlik<br />Sinifi</span></div>
+              </div>
+              <div className="analytics-list">
+                {groupedAssets.map((group) => (
+                  <div className="analytics-line" key={group.key}>
+                    <span style={{ background: groupColors[group.key] || "#647181" }} />
+                    <strong>{group.label}</strong>
+                    <b>{pct(totals.totalValue ? (group.value / totals.totalValue) * 100 : 0)}</b>
+                    <em>{money(group.value)}</em>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="callout-grid">
+              <article className="callout positive-bg"><span>En cok kazandiran</span><strong>{bestAsset?.asset.ticker || "-"}</strong><b>{bestAsset ? `${pct(bestAsset.returnRate)} (${signedMoney(bestAsset.profitLoss)})` : "%0"}</b></article>
+              <article className="callout negative-bg"><span>En cok kaybettiren</span><strong>{worstAsset?.asset.ticker || "-"}</strong><b>{worstAsset ? `${pct(worstAsset.returnRate)} (${signedMoney(worstAsset.profitLoss)})` : "%0"}</b></article>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "risk" ? (
+          <section className="panel risk-panel">
+            <div className="risk-head">
+              <div>
+                <h2>Risk & Cesitlilik Notu</h2>
+                <p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p>
+              </div>
+              <div className="score-row">
+                <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Genel Risk / 10</span></div>
+                <div className="score-pill"><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Cesitlilik / 10</span></div>
+              </div>
+            </div>
+            <div className="risk-grid">
+              <article><h3>Dagilim yapisi</h3><p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk pay {portfolioRows[0]?.asset.ticker || "-"} tarafinda ve toplam portfoyun {pct(topShare)} seviyesinde.</p></article>
+              <article><h3>Yogunlasma dengesi</h3><p>Degerli madenler, yatirim fonlari, hisse senetleri ve kripto varliklar ayni ekranda izleniyor. Bu dagilim tek bir varlik turune bagimliligi azaltir.</p></article>
+              <article><h3>Ortusme kontrolu</h3><p>Fonlar ile dogrudan hisse pozisyonlari arasinda kismi ortusme olabilir. En yuksek agirlikli varliklar duzenli izlenirse risk daha net yonetilir.</p></article>
+              <article><h3>Stratejik degerlendirme</h3><p>Portfoy orta riskli, cesitlendirilmis bir yapiya yakindir. Yeni yatirimlarda hedef paylara gore eksik kalan siniflara agirlik vermek dengeyi guclendirir.</p></article>
+            </div>
+          </section>
+        ) : null}
+
+        <section className={activeTab === "distribution" ? "panel" : "panel hidden"}>
           <div className="panel-header">
             <h2>Portfoy Varliklari</h2>
             <div className="toolbar">

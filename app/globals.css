@@ -461,9 +461,9 @@ select:focus {
 }
 
 .legend-grid {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 18px;
   margin-top: 12px;
 }
 
@@ -474,8 +474,8 @@ select:focus {
   font-size: 12px;
   color: #31445c;
   min-width: 0;
-  padding-right: 10px;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .legend-item span,
@@ -488,6 +488,13 @@ select:focus {
 
 .legend-item b {
   color: var(--ink);
+  flex: 0 0 auto;
+}
+
+.legend-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .portfolio-bars,
@@ -2261,8 +2268,8 @@ label {
 
   .print-report .legend-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
     padding: 0 12px 12px;
   }
 
@@ -2271,6 +2278,21 @@ label {
     min-width: 0;
     white-space: nowrap;
     font-size: 9px;
+    gap: 5px;
+  }
+
+  .print-report .legend-item span {
+    width: 9px;
+    height: 9px;
+  }
+
+  .print-report .legend-item strong {
+    max-width: 76px;
+  }
+
+  .print-report .report-portfolio-panel {
+    break-before: page;
+    page-break-before: always;
   }
 
   .print-report .portfolio-bars {

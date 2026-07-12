@@ -1744,7 +1744,7 @@ export default function Home() {
                 {groupedAssets.map((group) => {
                   const share = totals.totalValue ? (group.value / totals.totalValue) * 100 : 0;
                   return (
-                    <div key={group.key} className="legend-item" style={{ width: `${share}%` }}>
+                    <div key={group.key} className="legend-item">
                       <span style={{ background: groupColors[group.key] || "#647181" }} />
                       <strong>{group.label}</strong>
                       <b>{pct(share)}</b>
@@ -2352,7 +2352,7 @@ export default function Home() {
                 {groupedAssets.map((group) => {
                   const share = totals.totalValue ? (group.value / totals.totalValue) * 100 : 0;
                   return (
-                    <div key={group.key} className="legend-item" style={{ width: `${share}%` }}>
+                    <div key={group.key} className="legend-item">
                       <span style={{ background: groupColors[group.key] || "#647181" }} />
                       <strong>{group.label}</strong>
                       <b>{pct(share)}</b>
@@ -2362,7 +2362,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section className="report-panel">
+            <section className="report-panel report-portfolio-panel">
               <div className="report-panel-head"><h2>Genel Portfoy Dagilimi</h2><p>Varlik bazinda portfoy payi ve guncel deger.</p></div>
               <div className="portfolio-bars report-bars">
                 {portfolioRows.map((row) => (

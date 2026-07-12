@@ -65,6 +65,7 @@ type PortfolioSettings = {
   autoRefresh: boolean;
   targetAllocations: Record<string, number>;
   rebalanceAmount: number;
+  dismissedAlertIds: string[];
 };
 
 type PortfolioState = {
@@ -90,6 +91,7 @@ const defaultSettings: PortfolioSettings = {
   autoRefresh: true,
   targetAllocations: defaultTargetAllocations,
   rebalanceAmount: 50000,
+  dismissedAlertIds: [],
 };
 
 const emptyState: PortfolioState = {
@@ -127,6 +129,7 @@ const menuItems = [
   { key: "targets", label: "Hedef Portfoy", description: "Hedef oranlar, sapmalar ve yeni yatirim dagitim onerisi." },
   { key: "comparison", label: "Karsilastirma", description: "Portfoy getirini BIST, altin, doviz, Bitcoin ve global endekslerle karsilastir." },
   { key: "dataStatus", label: "Veri Durumu", description: "Fiyat kaynaklari, son guncelleme ve hata sagligi." },
+  { key: "alerts", label: "Uyarilar", description: "Hedef sapmalari, fiyat veri sorunlari ve risk sinyalleri." },
   { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
   { key: "analytics", label: "Portfoy Analitigi", description: "Sinif dengesi, en iyi ve en zayif performanslar." },
   { key: "risk", label: "Risk & Cesitlilik Notu", description: "Yogunlasma, cesitlilik ve stratejik denge ozeti." },
@@ -360,6 +363,7 @@ function normalizeSettings(settings?: Partial<PortfolioSettings> & { autoRefresh
   return {
     autoRefresh: settings?.autoRefresh !== false,
     rebalanceAmount: Number(settings?.rebalanceAmount || defaultSettings.rebalanceAmount),
+    dismissedAlertIds: Array.isArray(settings?.dismissedAlertIds) ? settings.dismissedAlertIds.map(String) : [],
     targetAllocations: Object.fromEntries(
       groupDefinitions.map((group) => [
         group.key,
@@ -854,6 +858,99 @@ export default function Home() {
     };
   }, [dataStatusRows]);
 
+  const alertRows = useMemo(() => {
+    const rows: Array<{ id: string; level: "high" | "medium" | "low"; category: string; title: string; detail: string; action: string }> = [];
+    const dismissed = new Set(normalizeSettings(state.settings).dismissedAlertIds);
+    dataStatusRows.forEach((row) => {
+      if (row.key === "error") {
+        rows.push({
+          id: `price-error-${row.asset.id}`,
+          level: "high",
+          category: "Fiyat verisi",
+          title: `${row.asset.ticker} fiyat kaynagi hata veriyor`,
+          detail: row.asset.lastPriceError || "Fiyat kaynagi okunamadi.",
+          action: "Veri Durumu ekranindan tek varligi yenilemeyi dene.",
+        });
+      }
+      if (row.key === "stale" || row.key === "missing") {
+        rows.push({
+          id: `price-stale-${row.asset.id}`,
+          level: "medium",
+          category: "Fiyat verisi",
+          title: `${row.asset.ticker} fiyati eski veya kayitsiz`,
+          detail: row.asset.lastPriceAt ? `Son guncelleme ${row.lastLabel}.` : "Bu varlik icin basarili fiyat kaydi yok.",
+          action: "Fiyatlari guncelle veya kaynak sembolunu kontrol et.",
+        });
+      }
+    });
+    portfolioRows.forEach((row) => {
+      if (row.cost > 0 && row.returnRate <= -10) {
+        rows.push({
+          id: `loss-high-${row.asset.id}`,
+          level: "high",
+          category: "Performans",
+          title: `${row.asset.ticker} zarari %10 seviyesini asti`,
+          detail: `${signedPct(row.returnRate)} · ${signedMoney(row.profitLoss)}`,
+          action: "Varlik detayindan maliyet, not ve islem gecmisini kontrol et.",
+        });
+      } else if (row.cost > 0 && row.returnRate <= -5) {
+        rows.push({
+          id: `loss-medium-${row.asset.id}`,
+          level: "medium",
+          category: "Performans",
+          title: `${row.asset.ticker} belirgin zararda`,
+          detail: `${signedPct(row.returnRate)} · ${signedMoney(row.profitLoss)}`,
+          action: "Pozisyonu izleme listesinde tut.",
+        });
+      }
+      if (row.share >= 20) {
+        rows.push({
+          id: `concentration-${row.asset.id}`,
+          level: row.share >= 30 ? "high" : "medium",
+          category: "Yogunlasma",
+          title: `${row.asset.ticker} portfoyde yuksek agirlikta`,
+          detail: `Portfoy payi ${pct(row.share)}.`,
+          action: "Hedef Portfoy ekraninda sinif ve varlik agirligini karsilastir.",
+        });
+      }
+    });
+    targetRows.forEach((row) => {
+      const absGap = Math.abs(row.gapShare);
+      if (row.targetShare > 0 && absGap >= 8) {
+        rows.push({
+          id: `target-gap-${row.key}`,
+          level: absGap >= 14 ? "high" : "medium",
+          category: "Hedef dagilim",
+          title: `${row.label} hedef dagilimdan uzaklasti`,
+          detail: `Mevcut ${pct(row.currentShare)}, hedef ${pct(row.targetShare)}, fark ${signedPct(row.gapShare)}.`,
+          action: "Yeni yatirim dagitim onerisine bak.",
+        });
+      }
+    });
+    if (dataStatusSummary.error === 0 && dataStatusSummary.stale === 0 && rows.length === 0) {
+      rows.push({
+        id: "healthy-portfolio",
+        level: "low",
+        category: "Genel durum",
+        title: "Aktif kritik uyari yok",
+        detail: "Fiyat verileri ve portfoy dengesi su an sakin gorunuyor.",
+        action: "Periyodik olarak fiyatlari guncellemeye devam et.",
+      });
+    }
+    const rank = { high: 0, medium: 1, low: 2 };
+    return rows
+      .map((row) => ({ ...row, dismissed: dismissed.has(row.id) }))
+      .sort((left, right) => rank[left.level] - rank[right.level] || Number(left.dismissed) - Number(right.dismissed) || left.title.localeCompare(right.title));
+  }, [dataStatusRows, dataStatusSummary.error, dataStatusSummary.stale, portfolioRows, state.settings, targetRows]);
+
+  const activeAlerts = useMemo(() => alertRows.filter((alert) => !alert.dismissed), [alertRows]);
+  const alertSummary = useMemo(() => ({
+    high: activeAlerts.filter((alert) => alert.level === "high").length,
+    medium: activeAlerts.filter((alert) => alert.level === "medium").length,
+    low: activeAlerts.filter((alert) => alert.level === "low").length,
+    dismissed: alertRows.filter((alert) => alert.dismissed).length,
+  }), [activeAlerts, alertRows]);
+
   const classGradient = useMemo(() => {
     let cursor = 0;
     const segments = groupedAssets.map((group) => {
@@ -1024,6 +1121,26 @@ export default function Home() {
   async function toggleAssetAutoUpdate(id: string) {
     const assets = state.assets.map((asset) => (asset.id === id ? { ...asset, autoUpdate: !asset.autoUpdate } : asset));
     await savePortfolio({ ...state, assets }, { snapshot: false });
+  }
+
+  async function dismissAlert(id: string) {
+    const settings = normalizeSettings(state.settings);
+    if (settings.dismissedAlertIds.includes(id)) return;
+    await savePortfolio({
+      ...state,
+      settings: { ...settings, dismissedAlertIds: [...settings.dismissedAlertIds, id] },
+    }, { snapshot: false });
+  }
+
+  async function clearActiveAlerts() {
+    const settings = normalizeSettings(state.settings);
+    const nextIds = Array.from(new Set([...settings.dismissedAlertIds, ...activeAlerts.map((alert) => alert.id)]));
+    await savePortfolio({ ...state, settings: { ...settings, dismissedAlertIds: nextIds } }, { snapshot: false });
+  }
+
+  async function resetDismissedAlerts() {
+    const settings = normalizeSettings(state.settings);
+    await savePortfolio({ ...state, settings: { ...settings, dismissedAlertIds: [] } }, { snapshot: false });
   }
 
   async function submitAsset(event: FormEvent) {
@@ -1994,6 +2111,45 @@ export default function Home() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "alerts" ? (
+          <>
+            <section className="insights-grid alert-kpis">
+              <article className={alertSummary.high ? "insight-card red" : "insight-card green"}><span>Yuksek onem</span><strong>{alertSummary.high}</strong><small>Kritik takip</small></article>
+              <article className={alertSummary.medium ? "insight-card gold" : "insight-card green"}><span>Orta onem</span><strong>{alertSummary.medium}</strong><small>Izleme listesi</small></article>
+              <article className="insight-card"><span>Bilgi</span><strong>{alertSummary.low}</strong><small>Dusuk onem</small></article>
+              <article className="insight-card"><span>Goruldu</span><strong>{alertSummary.dismissed}</strong><small>Temizlenen sinyal</small></article>
+              <article className={activeAlerts.length ? "insight-card red" : "insight-card green"}><span>Aktif uyari</span><strong>{activeAlerts.length}</strong><small>Su an dikkat isteyen</small></article>
+            </section>
+
+            <section className="panel alerts-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Uyari Merkezi</h2>
+                  <p>Fiyat verisi, hedef dagilim, zarar ve yogunlasma sinyalleri tek ekranda.</p>
+                </div>
+                <div className="row-actions">
+                  <button className="secondary" onClick={() => void clearActiveAlerts()} disabled={!activeAlerts.length}>Tumunu goruldu yap</button>
+                  <button className="secondary" onClick={() => void resetDismissedAlerts()} disabled={!alertSummary.dismissed}>Goruldu listesini sifirla</button>
+                </div>
+              </div>
+              <div className="alerts-list">
+                {alertRows.length ? alertRows.map((alert) => (
+                  <article className={`alert-row ${alert.level} ${alert.dismissed ? "dismissed" : ""}`} key={alert.id}>
+                    <div className="alert-level">{alert.level === "high" ? "Yuksek" : alert.level === "medium" ? "Orta" : "Bilgi"}</div>
+                    <div>
+                      <span>{alert.category}</span>
+                      <h3>{alert.title}</h3>
+                      <p>{alert.detail}</p>
+                      <small>{alert.action}</small>
+                    </div>
+                    <button className="secondary" onClick={() => void dismissAlert(alert.id)} disabled={alert.dismissed}>{alert.dismissed ? "Goruldu" : "Goruldu yap"}</button>
+                  </article>
+                )) : <div className="empty">Su an gosterilecek uyari yok.</div>}
               </div>
             </section>
           </>

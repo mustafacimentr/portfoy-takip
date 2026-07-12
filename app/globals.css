@@ -540,6 +540,56 @@ select:focus {
   background: white;
 }
 
+.cash-logo {
+  background: linear-gradient(135deg, #127a56, #18b884 58%, #cfeee2);
+  border-color: rgba(18, 128, 92, 0.28);
+}
+
+.cash-stack {
+  width: 18px;
+  height: 14px;
+  position: relative;
+  display: block;
+}
+
+.asset-logo.small .cash-stack {
+  width: 15px;
+  height: 12px;
+}
+
+.cash-stack span {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 8px;
+  border-radius: 3px;
+  background: #f8fff9;
+  border: 1px solid rgba(12, 104, 74, 0.35);
+  box-shadow: 0 1px 0 rgba(15, 23, 32, 0.08);
+}
+
+.cash-stack span:nth-child(1) {
+  top: 0;
+  transform: rotate(-8deg);
+}
+
+.cash-stack span:nth-child(2) {
+  top: 3px;
+  transform: rotate(4deg);
+}
+
+.cash-stack span:nth-child(3) {
+  top: 6px;
+}
+
+.cash-stack span:nth-child(3)::after {
+  content: "";
+  position: absolute;
+  inset: 2px 6px;
+  border-radius: 50%;
+  background: #18b884;
+}
+
 .logo-fallback {
   position: relative;
   z-index: 0;

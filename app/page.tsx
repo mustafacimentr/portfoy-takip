@@ -228,6 +228,7 @@ function cryptoBaseCode(symbol: string) {
 
 function assetLogoUrl(asset: Asset) {
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
+  if (asset.type === "Nakit" || code === "NAKIT") return "";
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
   if (cryptoBase && cryptoLogoUrls[cryptoBase]) return cryptoLogoUrls[cryptoBase];
   if (directAssetLogoUrls[code]) return directAssetLogoUrls[code];
@@ -239,9 +240,19 @@ function assetLogoUrl(asset: Asset) {
 
 function AssetLogo({ asset, color, small = false }: { asset: Asset; color: string; small?: boolean }) {
   const logoUrl = assetLogoUrl(asset);
+  const code = compactCode(asset.ticker || asset.priceSymbol || "");
+  const isCash = asset.type === "Nakit" || code === "NAKIT";
   return (
-    <span className={small ? "asset-logo small" : "asset-logo"} style={{ background: color }}>
-      <span className="logo-fallback">{assetInitials(asset)}</span>
+    <span className={`${small ? "asset-logo small" : "asset-logo"}${isCash ? " cash-logo" : ""}`} style={{ background: isCash ? undefined : color }}>
+      {isCash ? (
+        <span className="cash-stack" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      ) : (
+        <span className="logo-fallback">{assetInitials(asset)}</span>
+      )}
       {logoUrl ? (
         <img
           src={logoUrl}

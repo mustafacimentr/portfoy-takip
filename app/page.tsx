@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 type Asset = {
   id: string;
@@ -171,6 +172,16 @@ function AssetLogo({ asset, color, small = false }: { asset: Asset; color: strin
         />
       ) : null}
     </span>
+  );
+}
+
+function TrendValue({ trend, children }: { trend: number; children: ReactNode }) {
+  const direction = trend >= 0 ? "up" : "down";
+  return (
+    <strong className={`trend-value ${direction === "up" ? "positive" : "negative"}`}>
+      <span className={`trend-triangle ${direction}`} />
+      {children}
+    </strong>
   );
 }
 
@@ -876,19 +887,19 @@ export default function Home() {
         </section>
 
         <section className="cards">
-          <article className="card"><span>Toplam deger</span><strong>{money(totals.totalValue)}</strong><small>{state.assets.length} varlik</small></article>
           <article className="card"><span>Toplam maliyet</span><strong>{money(totals.totalCost)}</strong><small>Kayitli alis maliyeti</small></article>
-          <article className="card"><span>Kar / Zarar</span><strong className={totals.pl >= 0 ? "positive" : "negative"}>{money(totals.pl)}</strong><small>{pct(totals.rate)}</small></article>
+          <article className="card"><span>Guncel deger</span><TrendValue trend={totals.pl}>{money(totals.totalValue)}</TrendValue><small>{state.assets.length} varlik</small></article>
+          <article className="card"><span>Kar / Zarar</span><TrendValue trend={totals.pl}>{signedMoney(totals.pl)}</TrendValue><small>{pct(totals.rate)}</small></article>
           <article className="card"><span>Nakit</span><strong>{money(totals.cash)}</strong><small>Varlik tipi: Nakit</small></article>
         </section>
 
         {activeTab === "distribution" ? (
           <section className="insights-grid">
             <article className="insight-card gold"><span>Yatirilan ana para</span><strong>{money(totals.totalCost)}</strong></article>
-            <article className="insight-card"><span>Varlik degeri</span><strong>{money(totals.totalValue)}</strong></article>
-            <article className={totals.pl >= 0 ? "insight-card green" : "insight-card red"}><span>Net durum</span><strong>{signedMoney(totals.pl)}</strong><small>{pct(totals.rate)}</small></article>
-            <article className="insight-card green"><span>En iyi performans</span><strong>{bestAsset?.asset.ticker || "-"}</strong><small>{bestAsset ? pct(bestAsset.returnRate) : "%0"}</small></article>
-            <article className="insight-card red"><span>En zayif performans</span><strong>{worstAsset?.asset.ticker || "-"}</strong><small>{worstAsset ? pct(worstAsset.returnRate) : "%0"}</small></article>
+            <article className={totals.pl >= 0 ? "insight-card green" : "insight-card red"}><span>Varlik degeri</span><TrendValue trend={totals.pl}>{money(totals.totalValue)}</TrendValue></article>
+            <article className={totals.pl >= 0 ? "insight-card green" : "insight-card red"}><span>Net durum</span><TrendValue trend={totals.pl}>{signedMoney(totals.pl)}</TrendValue><small>{pct(totals.rate)}</small></article>
+            <article className={(bestAsset?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"}</strong><small className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(bestAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{bestAsset ? pct(bestAsset.returnRate) : "%0"}</small></article>
+            <article className={(worstAsset?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"}</strong><small className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(worstAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{worstAsset ? pct(worstAsset.returnRate) : "%0"}</small></article>
           </section>
         ) : null}
 

@@ -311,6 +311,31 @@ select:focus {
   color: var(--muted);
 }
 
+.trend-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trend-triangle {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+}
+
+.trend-triangle.up {
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid var(--green);
+}
+
+.trend-triangle.down {
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid var(--red);
+}
+
 .insights-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -352,6 +377,33 @@ select:focus {
 .insight-card strong {
   font-size: 20px;
   line-height: 1.1;
+}
+
+.insight-card small.positive,
+.insight-card strong.positive {
+  color: var(--green);
+}
+
+.insight-card small.negative,
+.insight-card strong.negative {
+  color: var(--red);
+}
+
+.insight-card small .trend-triangle {
+  margin-right: 6px;
+  transform: translateY(1px);
+}
+
+.insight-card small .trend-triangle.up {
+  border-left-width: 5px;
+  border-right-width: 5px;
+  border-bottom-width: 8px;
+}
+
+.insight-card small .trend-triangle.down {
+  border-left-width: 5px;
+  border-right-width: 5px;
+  border-top-width: 8px;
 }
 
 .panel {

@@ -216,6 +216,10 @@ function signedMoney(value: number) {
   return `${value >= 0 ? "+" : ""}${money(value)}`;
 }
 
+function absoluteMoney(value: number) {
+  return money(Math.abs(value));
+}
+
 function compactMoney(value: number) {
   if (Math.abs(value) >= 1000000) {
     return `${(value / 1000000).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} M TL`;
@@ -898,8 +902,8 @@ export default function Home() {
             <article className="insight-card gold"><span>Yatirilan ana para</span><strong>{money(totals.totalCost)}</strong></article>
             <article className={totals.pl >= 0 ? "insight-card green" : "insight-card red"}><span>Varlik degeri</span><TrendValue trend={totals.pl}>{money(totals.totalValue)}</TrendValue></article>
             <article className={totals.pl >= 0 ? "insight-card green" : "insight-card red"}><span>Net durum</span><TrendValue trend={totals.pl}>{signedMoney(totals.pl)}</TrendValue><small>{pct(totals.rate)}</small></article>
-            <article className={(bestAsset?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"}</strong><small className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(bestAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{bestAsset ? pct(bestAsset.returnRate) : "%0"}</small></article>
-            <article className={(worstAsset?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"}</strong><small className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(worstAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{worstAsset ? pct(worstAsset.returnRate) : "%0"}</small></article>
+            <article className={(bestAsset?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"}</strong><small className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(bestAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{bestAsset ? `${pct(bestAsset.returnRate)} · ${absoluteMoney(bestAsset.profitLoss)}` : "%0"}</small></article>
+            <article className={(worstAsset?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"}</strong><small className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(worstAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{worstAsset ? `${pct(worstAsset.returnRate)} · ${absoluteMoney(worstAsset.profitLoss)}` : "%0"}</small></article>
           </section>
         ) : null}
 

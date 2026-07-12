@@ -30,6 +30,7 @@ type Transaction = {
   type: string;
   quantity: number;
   price: number;
+  fee?: number;
   note: string;
 };
 
@@ -341,6 +342,19 @@ function normalizeBenchmarkPoint(point: Partial<BenchmarkPoint>): BenchmarkPoint
   };
 }
 
+function normalizeTransaction(tx: Partial<Transaction>): Transaction {
+  return {
+    id: tx.id || uid(),
+    assetId: String(tx.assetId || ""),
+    date: tx.date || plainDate(),
+    type: String(tx.type || "buy"),
+    quantity: Number(tx.quantity || 0),
+    price: Number(tx.price || 0),
+    fee: Number(tx.fee || 0),
+    note: String(tx.note || ""),
+  };
+}
+
 function normalizeSettings(settings?: Partial<PortfolioSettings> & { autoRefresh?: boolean }): PortfolioSettings {
   const incomingTargets = settings?.targetAllocations || {};
   return {
@@ -477,6 +491,7 @@ export default function Home() {
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
+  const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
   const [lastSync, setLastSync] = useState("");
 
   useEffect(() => {
@@ -737,14 +752,32 @@ export default function Home() {
         : priceAgeHours > 24
           ? "Eski"
           : "Guncel";
+    const transactions = state.transactions
+      .map(normalizeTransaction)
+      .filter((tx) => tx.assetId === asset.id)
+      .sort((left, right) => right.date.localeCompare(left.date));
+    const transactionSummary = transactions.reduce((summary, tx) => {
+      const gross = tx.quantity * tx.price;
+      if (tx.type === "buy") summary.buyTotal += gross + (tx.fee || 0);
+      if (tx.type === "sell") {
+        summary.sellTotal += gross - (tx.fee || 0);
+        summary.realizedProfit += gross - tx.quantity * asset.avgCost - (tx.fee || 0);
+      }
+      if (tx.type === "dividend" || tx.type === "distribution") summary.income += tx.price;
+      if (tx.type === "fee" || tx.type === "tax") summary.expense += tx.price + (tx.fee || 0);
+      if (tx.type === "transfer") summary.transferCount += 1;
+      return summary;
+    }, { buyTotal: 0, sellTotal: 0, realizedProfit: 0, income: 0, expense: 0, transferCount: 0 });
+    const netRealized = transactionSummary.realizedProfit + transactionSummary.income - transactionSummary.expense;
     const notes = [
       rank > 0 && rank <= 3 ? "Bu varlik portfoyun en buyuk 3 pozisyonundan biri." : "",
       asset.target ? (targetGap >= 0 ? "Hedef payinin altinda; yeni yatirimlarda desteklenebilir." : "Hedef payinin uzerinde; agirligi izlenebilir.") : "Bu varlik icin hedef pay belirlenmemis.",
       profitLoss >= 0 ? "Pozisyon karda gorunuyor." : "Pozisyon zararda gorunuyor.",
+      transactions.length ? `${transactions.length} islem kaydi tutuluyor; gerceklesmis sonuc ayrica izleniyor.` : "Bu varlik icin henuz islem gecmisi yok.",
       priceStatus === "Guncel" ? "Fiyat verisi guncel." : priceStatus === "Eski" ? "Fiyat verisi 24 saatten eski olabilir." : priceStatus === "Hata" ? "Fiyat kaynaginda hata kaydi var." : "Fiyat guncelleme kaydi yok.",
     ].filter(Boolean);
-    return { asset, value, cost, profitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes };
-  }, [portfolioRows, selectedAssetId, state.assets, totals.totalValue]);
+    return { asset, value, cost, profitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes, transactions, transactionSummary, netRealized };
+  }, [portfolioRows, selectedAssetId, state.assets, state.transactions, totals.totalValue]);
 
   const dataStatusRows = useMemo(() => {
     return state.assets.map((asset) => {
@@ -889,7 +922,7 @@ export default function Home() {
     const data = await api<{ state: PortfolioState }>("/api/portfolio", code);
     setState({
       assets: (data.state.assets || []).map(normalizeAsset),
-      transactions: data.state.transactions || [],
+      transactions: (data.state.transactions || []).map(normalizeTransaction),
       history: (data.state.history || []).map(normalizeSnapshot),
       cashFlows: (data.state.cashFlows || []).map(normalizeCashFlow),
       benchmarkHistory: (data.state.benchmarkHistory || []).map(normalizeBenchmarkPoint),
@@ -1188,6 +1221,7 @@ export default function Home() {
 
   function openAssetDetail(asset: Asset) {
     setSelectedAssetId(asset.id);
+    setTransactionDraft({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
   }
 
   function updateDraftTicker(value: string) {
@@ -1203,6 +1237,31 @@ export default function Home() {
       transactions: state.transactions.filter((tx) => tx.assetId !== id),
     });
     if (selectedAssetId === id) setSelectedAssetId("");
+  }
+
+  async function submitTransaction(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedAssetDetail) return;
+    const tx = normalizeTransaction({
+      id: uid(),
+      assetId: selectedAssetDetail.asset.id,
+      date: transactionDraft.date,
+      type: transactionDraft.type,
+      quantity: parseAmount(transactionDraft.quantity),
+      price: parseAmount(transactionDraft.price),
+      fee: parseAmount(transactionDraft.fee),
+      note: transactionDraft.note,
+    });
+    if (!tx.date || (!tx.quantity && !tx.price)) {
+      alert("Islem icin tarih ve tutar bilgisi gerekli.");
+      return;
+    }
+    await savePortfolio({ ...state, transactions: [...state.transactions.map(normalizeTransaction), tx] });
+    setTransactionDraft({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
+  }
+
+  async function deleteTransaction(id: string) {
+    await savePortfolio({ ...state, transactions: state.transactions.map(normalizeTransaction).filter((tx) => tx.id !== id) }, { snapshot: false });
   }
 
   async function importBackup(file: File) {
@@ -1222,7 +1281,7 @@ export default function Home() {
     const data = JSON.parse(text);
     return {
       assets: (data.assets || []).map(normalizeAsset),
-      transactions: data.transactions || [],
+      transactions: (data.transactions || []).map(normalizeTransaction),
       history: (data.history || []).map(normalizeSnapshot),
       cashFlows: (data.cashFlows || []).map(normalizeCashFlow),
       benchmarkHistory: (data.benchmarkHistory || []).map(normalizeBenchmarkPoint),
@@ -2208,6 +2267,9 @@ export default function Home() {
               <article><span>Fiyat kaynagi</span><strong>{selectedAssetDetail.asset.priceSource}</strong><small>{selectedAssetDetail.asset.priceSymbol}</small></article>
               <article><span>Son guncelleme</span><strong>{selectedAssetDetail.asset.lastPriceAt ? formatTime(selectedAssetDetail.asset.lastPriceAt) : "-"}</strong><small>{selectedAssetDetail.priceStatus}</small></article>
               <article><span>Pozisyon sirasi</span><strong>{selectedAssetDetail.rank || "-"}</strong><small>Degere gore</small></article>
+              <article className={selectedAssetDetail.netRealized >= 0 ? "positive-card" : "negative-card"}><span>Gerceklesmis sonuc</span><TrendValue trend={selectedAssetDetail.netRealized}>{signedMoney(selectedAssetDetail.netRealized)}</TrendValue><small>Islem gecmisinden</small></article>
+              <article><span>Toplam islem</span><strong>{selectedAssetDetail.transactions.length}</strong><small>Kayitli hareket</small></article>
+              <article><span>Gelir / gider</span><strong>{money(selectedAssetDetail.transactionSummary.income - selectedAssetDetail.transactionSummary.expense)}</strong><small>Temettu, dagitim, komisyon, vergi</small></article>
             </div>
 
             <div className="asset-detail-body">
@@ -2219,6 +2281,47 @@ export default function Home() {
                 <h3>Kisisel not</h3>
                 <p>{selectedAssetDetail.asset.note || "Bu varlik icin not eklenmemis."}</p>
               </section>
+            </div>
+
+            <div className="transaction-panel">
+              <div className="transaction-head">
+                <div>
+                  <h3>Islem gecmisi</h3>
+                  <p>Alis, satis, temettu, fon dagitimi, komisyon ve vergi kayitlarini burada takip edebilirsin.</p>
+                </div>
+                <strong className={selectedAssetDetail.netRealized >= 0 ? "positive" : "negative"}>{signedMoney(selectedAssetDetail.netRealized)}</strong>
+              </div>
+              <form className="transaction-form" onSubmit={(event) => void submitTransaction(event)}>
+                <select value={transactionDraft.type} onChange={(event) => setTransactionDraft({ ...transactionDraft, type: event.target.value })}>
+                  <option value="buy">Alis</option>
+                  <option value="sell">Satis</option>
+                  <option value="dividend">Temettu</option>
+                  <option value="distribution">Fon dagitimi</option>
+                  <option value="fee">Komisyon</option>
+                  <option value="tax">Vergi</option>
+                  <option value="transfer">Transfer</option>
+                </select>
+                <input className="input" type="date" value={transactionDraft.date} onChange={(event) => setTransactionDraft({ ...transactionDraft, date: event.target.value })} />
+                <input className="input" value={transactionDraft.quantity} onChange={(event) => setTransactionDraft({ ...transactionDraft, quantity: event.target.value })} placeholder="Adet" />
+                <input className="input" value={transactionDraft.price} onChange={(event) => setTransactionDraft({ ...transactionDraft, price: event.target.value })} placeholder={["dividend", "distribution", "fee", "tax"].includes(transactionDraft.type) ? "Tutar" : "Fiyat"} />
+                <input className="input" value={transactionDraft.fee} onChange={(event) => setTransactionDraft({ ...transactionDraft, fee: event.target.value })} placeholder="Komisyon" />
+                <input className="input" value={transactionDraft.note} onChange={(event) => setTransactionDraft({ ...transactionDraft, note: event.target.value })} placeholder="Not" />
+                <button className="primary">Ekle</button>
+              </form>
+              <div className="transaction-list">
+                {selectedAssetDetail.transactions.length ? selectedAssetDetail.transactions.map((tx) => {
+                  const label = tx.type === "buy" ? "Alis" : tx.type === "sell" ? "Satis" : tx.type === "dividend" ? "Temettu" : tx.type === "distribution" ? "Fon dagitimi" : tx.type === "fee" ? "Komisyon" : tx.type === "tax" ? "Vergi" : "Transfer";
+                  const amount = tx.type === "buy" || tx.type === "sell" ? tx.quantity * tx.price : tx.price;
+                  return (
+                    <div className="transaction-row" key={tx.id}>
+                      <span className={`transaction-type ${tx.type}`}>{label}</span>
+                      <strong>{money(amount)}</strong>
+                      <small>{tx.date} · {tx.quantity ? `${num(tx.quantity)} adet` : "Tutar kaydi"}{tx.fee ? ` · Komisyon ${money(tx.fee)}` : ""}{tx.note ? ` · ${tx.note}` : ""}</small>
+                      <button className="icon-btn" onClick={() => void deleteTransaction(tx.id)} title="Sil">x</button>
+                    </div>
+                  );
+                }) : <div className="empty">Bu varlik icin henuz islem kaydi yok.</div>}
+              </div>
             </div>
           </section>
         </div>

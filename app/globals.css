@@ -1532,6 +1532,85 @@ th {
   line-height: 1.5;
 }
 
+.transaction-panel {
+  border-top: 1px solid var(--line);
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.transaction-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.transaction-head h3 {
+  margin: 0;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.transaction-head p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.transaction-form {
+  display: grid;
+  grid-template-columns: 120px 150px repeat(4, minmax(0, 1fr)) 80px;
+  gap: 8px;
+  align-items: center;
+}
+
+.transaction-list {
+  display: grid;
+  gap: 8px;
+}
+
+.transaction-row {
+  display: grid;
+  grid-template-columns: 120px 130px minmax(0, 1fr) 36px;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 10px;
+}
+
+.transaction-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.transaction-type {
+  display: inline-flex;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 900;
+  background: #eef4ff;
+  color: #193a6a;
+}
+
+.transaction-type.sell,
+.transaction-type.fee,
+.transaction-type.tax {
+  background: #fde6e3;
+  color: var(--red);
+}
+
+.transaction-type.dividend,
+.transaction-type.distribution {
+  background: #ddf7ed;
+  color: var(--green);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1678,6 +1757,8 @@ label {
   .rebalance-row,
   .benchmark-grid,
   .source-grid,
+  .transaction-form,
+  .transaction-row,
   .asset-detail-grid,
   .asset-detail-body {
     grid-template-columns: 1fr;
@@ -1691,6 +1772,10 @@ label {
   .asset-detail-notes {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .transaction-head {
+    flex-direction: column;
   }
 
   .rebalance-amount {

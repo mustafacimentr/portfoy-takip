@@ -18,6 +18,7 @@ test("portfolio state keeps history and cash flow data in backups", async () => 
   assert.match(page, /type PortfolioSnapshot/);
   assert.match(page, /type CashFlow/);
   assert.match(page, /type BenchmarkPoint/);
+  assert.match(page, /normalizeTransaction/);
   assert.match(page, /defaultTargetAllocations/);
   assert.match(page, /history:\s*\[\]/);
   assert.match(page, /cashFlows:\s*\[\]/);
@@ -50,6 +51,10 @@ test("performance history screen is wired into the portfolio dashboard", async (
   assert.match(page, /Kisisel Portfoy Raporu/);
   assert.match(page, /printPortfolioReport/);
   assert.match(page, /selectedAssetDetail/);
+  assert.match(page, /Islem gecmisi/);
+  assert.match(page, /Gerceklesmis sonuc/);
+  assert.match(page, /submitTransaction/);
+  assert.match(page, /deleteTransaction/);
   assert.match(page, /Analiz notlari/);
   assert.match(page, /Kategori ici pay/);
   assert.match(page, /benchmarkDefinitions/);
@@ -80,5 +85,8 @@ test("performance history screen is wired into the portfolio dashboard", async (
   assert.match(css, /\.print-table/);
   assert.match(css, /\.asset-detail-modal/);
   assert.match(css, /\.asset-detail-grid/);
+  assert.match(css, /\.transaction-form/);
+  assert.match(css, /\.transaction-row/);
+  assert.match(css, /\.transaction-type/);
   assert.match(css, /\.range-tabs/);
 });

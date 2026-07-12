@@ -451,15 +451,40 @@ select:focus {
   grid-template-columns: 58px minmax(160px, 1fr) 120px;
 }
 
-.avatar {
-  width: 26px;
-  height: 26px;
+.asset-logo {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  position: relative;
+  overflow: hidden;
   color: white;
   font-size: 10px;
   font-weight: 900;
+  border: 1px solid rgba(15, 23, 32, 0.08);
+  box-shadow: 0 1px 2px rgba(15, 23, 32, 0.08);
+  flex: 0 0 auto;
+}
+
+.asset-logo.small {
+  width: 22px;
+  height: 22px;
+  font-size: 8px;
+}
+
+.asset-logo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: white;
+}
+
+.logo-fallback {
+  position: relative;
+  z-index: 0;
 }
 
 .bar-track {

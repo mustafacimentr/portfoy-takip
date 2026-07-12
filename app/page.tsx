@@ -91,6 +91,33 @@ const groupColors: Record<string, string> = {
 };
 const preciousCodes = new Set(["ALTINS1", "ALTIN", "GMSTRF", "GMSTR"]);
 const fundCodes = new Set(["TGE", "TMG", "KPH"]);
+const cryptoLogoUrls: Record<string, string> = {
+  BTC: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
+  LINK: "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png",
+  RENDER: "https://assets.coingecko.com/coins/images/11636/small/rndr.png",
+  RNDR: "https://assets.coingecko.com/coins/images/11636/small/rndr.png",
+  ONDO: "https://assets.coingecko.com/coins/images/26580/small/ONDO.png",
+  ALGO: "https://assets.coingecko.com/coins/images/4380/small/download.png",
+  SUI: "https://assets.coingecko.com/coins/images/26375/small/sui-ocean-square.png",
+  XRP: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
+  NEAR: "https://assets.coingecko.com/coins/images/10365/small/near.jpg",
+};
+const assetLogoDomains: Record<string, string> = {
+  ALTINS1: "darphane.gov.tr",
+  ALTIN: "darphane.gov.tr",
+  GMSTRF: "darphane.gov.tr",
+  GMSTR: "darphane.gov.tr",
+  TGE: "isportfoy.com.tr",
+  TMG: "isportfoy.com.tr",
+  KPH: "isportfoy.com.tr",
+  TUPRS: "tupras.com.tr",
+  FROTO: "fordotosan.com.tr",
+  BIMAS: "bim.com.tr",
+  VAKBN: "vakifbank.com.tr",
+  TAVHL: "tavhavalimanlari.com.tr",
+  ULKER: "ulker.com.tr",
+  PGSUS: "flypgs.com",
+};
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -98,6 +125,49 @@ function uid() {
 
 function compactCode(value: string) {
   return String(value || "").toUpperCase().replace(/^BIST:/, "").replace(/[^A-Z0-9]/g, "");
+}
+
+function faviconUrl(domain: string) {
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+}
+
+function assetInitials(asset: Asset) {
+  return compactCode(asset.ticker || asset.priceSymbol || asset.name).slice(0, 2) || "PF";
+}
+
+function cryptoBaseCode(symbol: string) {
+  const compact = compactCode(symbol);
+  const quote = ["TRY", "USDT", "USD", "EUR"].find((suffix) => compact.endsWith(suffix));
+  return quote ? compact.slice(0, -quote.length) : compact;
+}
+
+function assetLogoUrl(asset: Asset) {
+  const code = compactCode(asset.ticker || asset.priceSymbol || "");
+  const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
+  if (cryptoBase && cryptoLogoUrls[cryptoBase]) return cryptoLogoUrls[cryptoBase];
+  const domain = assetLogoDomains[code] || assetLogoDomains[compactCode(asset.priceSymbol || "")];
+  if (domain) return faviconUrl(domain);
+  if (asset.priceSource === "isportfoy" || asset.priceSource === "tefas") return faviconUrl("isportfoy.com.tr");
+  return "";
+}
+
+function AssetLogo({ asset, color, small = false }: { asset: Asset; color: string; small?: boolean }) {
+  const logoUrl = assetLogoUrl(asset);
+  return (
+    <span className={small ? "asset-logo small" : "asset-logo"} style={{ background: color }}>
+      <span className="logo-fallback">{assetInitials(asset)}</span>
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt=""
+          loading="lazy"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      ) : null}
+    </span>
+  );
 }
 
 function parseAmount(value: string | number) {
@@ -855,7 +925,7 @@ export default function Home() {
             <div className="portfolio-bars">
               {portfolioRows.map((row) => (
                 <div className="portfolio-bar-row" key={row.asset.id}>
-                  <div className="avatar" style={{ background: row.color }}>{row.initials}</div>
+                  <AssetLogo asset={row.asset} color={row.color} />
                   <strong>{row.asset.ticker}</strong>
                   <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, row.share)}%`, background: row.color }} /></div>
                   <span>{pct(row.share)}</span>
@@ -982,7 +1052,7 @@ export default function Home() {
                     <tr>
                       <td>
                         <div className="asset-name">
-                          <span className="dot" style={{ background: colors[index % colors.length] }} />
+                          <AssetLogo asset={asset} color={colors[index % colors.length]} small />
                           <div>
                             <strong>{asset.ticker}</strong>
                             <small>{asset.name} · {asset.priceSource} oto {asset.lastPriceAt ? `· ${formatTime(asset.lastPriceAt)}` : ""}{asset.lastPriceError ? ` · Hata: ${asset.lastPriceError}` : ""}</small>

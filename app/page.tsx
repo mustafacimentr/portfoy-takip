@@ -125,6 +125,7 @@ const menuItems = [
   { key: "performance", label: "Performans Gecmisi", description: "Portfoy degerinin zaman icindeki degisimi ve nakit akisi." },
   { key: "targets", label: "Hedef Portfoy", description: "Hedef oranlar, sapmalar ve yeni yatirim dagitim onerisi." },
   { key: "comparison", label: "Karsilastirma", description: "Portfoy getirini BIST, altin, doviz, Bitcoin ve global endekslerle karsilastir." },
+  { key: "dataStatus", label: "Veri Durumu", description: "Fiyat kaynaklari, son guncelleme ve hata sagligi." },
   { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
   { key: "analytics", label: "Portfoy Analitigi", description: "Sinif dengesi, en iyi ve en zayif performanslar." },
   { key: "risk", label: "Risk & Cesitlilik Notu", description: "Yogunlasma, cesitlilik ve stratejik denge ozeti." },
@@ -368,6 +369,18 @@ function compactMoney(value: number) {
 function formatTime(value?: string) {
   if (!value) return "";
   return new Date(value).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function formatAge(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const diffMinutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+  if (diffMinutes < 1) return "Az once";
+  if (diffMinutes < 60) return `${diffMinutes} dk once`;
+  const hours = Math.round(diffMinutes / 60);
+  if (hours < 48) return `${hours} saat once`;
+  return `${Math.round(hours / 24)} gun once`;
 }
 
 function inferAssetDetails(input: string) {
@@ -733,6 +746,81 @@ export default function Home() {
     return { asset, value, cost, profitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes };
   }, [portfolioRows, selectedAssetId, state.assets, totals.totalValue]);
 
+  const dataStatusRows = useMemo(() => {
+    return state.assets.map((asset) => {
+      const lastDate = asset.lastPriceAt ? new Date(asset.lastPriceAt) : null;
+      const ageHours = lastDate && !Number.isNaN(lastDate.getTime()) ? (Date.now() - lastDate.getTime()) / 3600000 : null;
+      let key = "fresh";
+      let label = "Guncel";
+      let tone = "ok";
+      if (!asset.autoUpdate) {
+        key = "disabled";
+        label = "Kapali";
+        tone = "muted";
+      } else if (asset.priceSource === "manual") {
+        key = "manual";
+        label = "Manuel";
+        tone = "manual";
+      } else if (asset.lastPriceError) {
+        key = "error";
+        label = "Hata";
+        tone = "error";
+      } else if (ageHours === null) {
+        key = "missing";
+        label = "Kayit yok";
+        tone = "warning";
+      } else if (ageHours > 24) {
+        key = "stale";
+        label = "Eski";
+        tone = "warning";
+      }
+      return {
+        asset,
+        key,
+        label,
+        tone,
+        ageHours,
+        lastLabel: asset.lastPriceAt ? formatAge(asset.lastPriceAt) : "-",
+        sourceLabel: `${asset.priceSource || "manual"}${asset.priceSymbol ? ` / ${asset.priceSymbol}` : ""}`,
+      };
+    }).sort((left, right) => {
+      const rank: Record<string, number> = { error: 0, stale: 1, missing: 2, manual: 3, disabled: 4, fresh: 5 };
+      return (rank[left.key] ?? 9) - (rank[right.key] ?? 9) || left.asset.ticker.localeCompare(right.asset.ticker);
+    });
+  }, [state.assets]);
+
+  const dataStatusSummary = useMemo(() => {
+    const counts = dataStatusRows.reduce<Record<string, number>>((result, row) => {
+      result[row.key] = (result[row.key] || 0) + 1;
+      return result;
+    }, {});
+    const scoreWeights: Record<string, number> = { fresh: 100, manual: 75, disabled: 45, stale: 55, missing: 40, error: 0 };
+    const score = dataStatusRows.length
+      ? dataStatusRows.reduce((sum, row) => sum + (scoreWeights[row.key] ?? 50), 0) / dataStatusRows.length
+      : 100;
+    const sourceMap = new Map<string, { source: string; total: number; fresh: number; error: number; stale: number; manual: number; disabled: number }>();
+    dataStatusRows.forEach((row) => {
+      const source = row.asset.priceSource || "manual";
+      const current = sourceMap.get(source) || { source, total: 0, fresh: 0, error: 0, stale: 0, manual: 0, disabled: 0 };
+      current.total += 1;
+      if (row.key === "fresh") current.fresh += 1;
+      if (row.key === "error") current.error += 1;
+      if (row.key === "stale" || row.key === "missing") current.stale += 1;
+      if (row.key === "manual") current.manual += 1;
+      if (row.key === "disabled") current.disabled += 1;
+      sourceMap.set(source, current);
+    });
+    return {
+      score,
+      fresh: counts.fresh || 0,
+      stale: (counts.stale || 0) + (counts.missing || 0),
+      error: counts.error || 0,
+      manual: counts.manual || 0,
+      disabled: counts.disabled || 0,
+      sources: Array.from(sourceMap.values()).sort((left, right) => right.error - left.error || right.stale - left.stale || right.total - left.total),
+    };
+  }, [dataStatusRows]);
+
   const classGradient = useMemo(() => {
     let cursor = 0;
     const segments = groupedAssets.map((group) => {
@@ -862,20 +950,47 @@ export default function Home() {
   async function updatePrices() {
     if (!passcode || !state.assets.length) return;
     setLoading(true);
-    const updated = await Promise.all(
-      state.assets.map(async (asset) => {
-        if (!asset.autoUpdate || asset.priceSource === "manual") return asset;
-        try {
-          const result = await fetchPrice(asset);
-          return { ...asset, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
-        } catch (error) {
-          return { ...asset, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
-        }
-      }),
-    );
-    const benchmarkHistory = await collectBenchmarkHistory(state.benchmarkHistory);
-    await savePortfolio({ ...state, assets: updated, benchmarkHistory });
-    setLoading(false);
+    try {
+      const updated = await Promise.all(
+        state.assets.map(async (asset) => {
+          if (!asset.autoUpdate || asset.priceSource === "manual") return asset;
+          try {
+            const result = await fetchPrice(asset);
+            return { ...asset, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
+          } catch (error) {
+            return { ...asset, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
+          }
+        }),
+      );
+      const benchmarkHistory = await collectBenchmarkHistory(state.benchmarkHistory);
+      await savePortfolio({ ...state, assets: updated, benchmarkHistory });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function refreshAssetPrice(id: string) {
+    if (!passcode) return;
+    const target = state.assets.find((asset) => asset.id === id);
+    if (!target || target.priceSource === "manual") return;
+    setLoading(true);
+    try {
+      let nextAsset = target;
+      try {
+        const result = await fetchPrice(target);
+        nextAsset = { ...target, autoUpdate: true, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
+      } catch (error) {
+        nextAsset = { ...target, autoUpdate: true, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
+      }
+      await savePortfolio({ ...state, assets: state.assets.map((asset) => (asset.id === id ? nextAsset : asset)) });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggleAssetAutoUpdate(id: string) {
+    const assets = state.assets.map((asset) => (asset.id === id ? { ...asset, autoUpdate: !asset.autoUpdate } : asset));
+    await savePortfolio({ ...state, assets }, { snapshot: false });
   }
 
   async function submitAsset(event: FormEvent) {
@@ -1727,6 +1842,85 @@ export default function Home() {
                         <td><span className={`target-status ${row.difference >= 0 ? "balanced" : "over"}`}>{row.difference >= 0 ? "Onde" : "Geride"}</span></td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "dataStatus" ? (
+          <>
+            <section className="insights-grid data-status-kpis">
+              <article className={dataStatusSummary.score >= 80 ? "insight-card green" : dataStatusSummary.score >= 55 ? "insight-card gold" : "insight-card red"}>
+                <span>Veri sagligi</span>
+                <strong>{dataStatusSummary.score.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}/100</strong>
+                <small>Fiyat kaynaklari genel durumu</small>
+              </article>
+              <article className="insight-card green"><span>Guncel</span><strong>{dataStatusSummary.fresh}</strong><small>24 saatten yeni fiyat</small></article>
+              <article className={dataStatusSummary.stale ? "insight-card gold" : "insight-card green"}><span>Eski / kayitsiz</span><strong>{dataStatusSummary.stale}</strong><small>Kontrol gerekebilir</small></article>
+              <article className={dataStatusSummary.error ? "insight-card red" : "insight-card green"}><span>Hata</span><strong>{dataStatusSummary.error}</strong><small>Kaynak okunamadi</small></article>
+              <article className="insight-card"><span>Manuel / kapali</span><strong>{dataStatusSummary.manual + dataStatusSummary.disabled}</strong><small>Otomatik izlenmiyor</small></article>
+            </section>
+
+            <section className="panel data-source-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Kaynak Ozeti</h2>
+                  <p>Binance, Yahoo, TradingView, Is Portfoy ve manuel kaynaklarin anlik saglik durumu.</p>
+                </div>
+                <button className="primary" onClick={() => void updatePrices()} disabled={loading}>Tum fiyatlari yenile</button>
+              </div>
+              <div className="source-grid">
+                {dataStatusSummary.sources.map((source) => (
+                  <article className={source.error ? "source-card error" : source.stale ? "source-card warning" : "source-card ok"} key={source.source}>
+                    <span>{source.source}</span>
+                    <strong>{source.total} varlik</strong>
+                    <small>{source.fresh} guncel · {source.stale} eski · {source.error} hata</small>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel data-status-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Fiyat Guncelleme Merkezi</h2>
+                  <p>Her varligin fiyat kaynagi, son basarili guncellemesi ve hata kaydi.</p>
+                </div>
+              </div>
+              <div className="table-scroll">
+                <table className="data-status-table">
+                  <thead>
+                    <tr><th>Varlik</th><th>Kaynak</th><th>Son guncelleme</th><th>Durum</th><th>Hata</th><th /></tr>
+                  </thead>
+                  <tbody>
+                    {dataStatusRows.length ? dataStatusRows.map((row) => (
+                      <tr key={row.asset.id}>
+                        <td>
+                          <button className="asset-name asset-detail-trigger" onClick={() => openAssetDetail(row.asset)} title="Varlik detayini ac">
+                            <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small />
+                            <div>
+                              <strong>{row.asset.ticker}</strong>
+                              <small>{row.asset.name}</small>
+                            </div>
+                          </button>
+                        </td>
+                        <td><span className="source-label">{row.sourceLabel}</span></td>
+                        <td>
+                          <strong>{row.asset.lastPriceAt ? formatTime(row.asset.lastPriceAt) : "-"}</strong>
+                          <small className="muted-block">{row.lastLabel}</small>
+                        </td>
+                        <td><span className={`data-status-badge ${row.tone}`}>{row.label}</span></td>
+                        <td className="data-error-cell">{row.asset.lastPriceError || "-"}</td>
+                        <td className="row-actions wide-actions">
+                          <button className="icon-btn text-btn" onClick={() => void refreshAssetPrice(row.asset.id)} disabled={loading || row.asset.priceSource === "manual"} title="Tek varligi yenile">Yenile</button>
+                          <button className="icon-btn text-btn" onClick={() => void toggleAssetAutoUpdate(row.asset.id)} disabled={loading || row.asset.priceSource === "manual"} title="Otomatik guncelleme">{row.asset.autoUpdate ? "Oto acik" : "Oto kapali"}</button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={6}><div className="empty">Henuz takip edilen varlik yok.</div></td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>

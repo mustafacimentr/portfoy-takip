@@ -954,6 +954,135 @@ select:focus {
   min-width: 880px;
 }
 
+.data-source-panel,
+.data-status-panel {
+  overflow: hidden;
+}
+
+.data-status-kpis .insight-card strong {
+  font-size: 22px;
+}
+
+.source-grid {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.source-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 14px;
+  min-height: 96px;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+}
+
+.source-card.ok {
+  border-color: #a9e7d0;
+  background: #eefaf5;
+}
+
+.source-card.warning {
+  border-color: #f0d58e;
+  background: #fff9e6;
+}
+
+.source-card.error {
+  border-color: #f3b8b0;
+  background: #fff0ee;
+}
+
+.source-card span {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 900;
+}
+
+.source-card strong {
+  font-size: 20px;
+  text-transform: capitalize;
+}
+
+.source-card small,
+.muted-block {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.data-status-table {
+  min-width: 1080px;
+}
+
+.source-label {
+  display: inline-flex;
+  max-width: 220px;
+  white-space: normal;
+  color: #31445c;
+  font-weight: 800;
+}
+
+.data-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 84px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.data-status-badge.ok {
+  background: #ddf7ed;
+  color: var(--green);
+}
+
+.data-status-badge.warning {
+  background: #fff6d8;
+  color: #9a6a00;
+}
+
+.data-status-badge.error {
+  background: #fde6e3;
+  color: var(--red);
+}
+
+.data-status-badge.manual {
+  background: #eef4ff;
+  color: #193a6a;
+}
+
+.data-status-badge.muted {
+  background: #eef1f4;
+  color: var(--muted);
+}
+
+.data-error-cell {
+  max-width: 260px;
+  color: var(--muted);
+  white-space: normal;
+  font-size: 12px;
+}
+
+.wide-actions {
+  min-width: 180px;
+}
+
+.icon-btn.text-btn {
+  width: auto;
+  min-width: 72px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .analytics-layout {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
@@ -1479,7 +1608,8 @@ label {
   .return-grid,
   .return-breakdown,
   .target-settings-grid,
-  .benchmark-grid {
+  .benchmark-grid,
+  .source-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1543,6 +1673,7 @@ label {
   .target-settings-grid,
   .rebalance-row,
   .benchmark-grid,
+  .source-grid,
   .asset-detail-grid,
   .asset-detail-body {
     grid-template-columns: 1fr;

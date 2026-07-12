@@ -342,6 +342,10 @@ select:focus {
   gap: 12px;
 }
 
+.performance-kpis .insight-card strong {
+  font-size: 18px;
+}
+
 .insight-card {
   min-height: 82px;
   background: white;
@@ -443,7 +447,9 @@ select:focus {
 .projection-list,
 .analytics-layout,
 .callout-grid,
-.risk-grid {
+.risk-grid,
+.history-chart-wrap,
+.cash-flow-body {
   padding: 18px;
 }
 
@@ -555,6 +561,142 @@ select:focus {
 
 .bar-fill.accent {
   background: #b17d12;
+}
+
+.range-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.range-tabs button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.range-tabs button.active {
+  background: #10243f;
+  border-color: #10243f;
+  color: white;
+}
+
+.history-chart-wrap {
+  display: grid;
+  gap: 12px;
+}
+
+.chart-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chart-summary-row strong {
+  color: var(--ink);
+}
+
+.history-chart {
+  width: 100%;
+  height: 260px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: visible;
+}
+
+.history-chart line {
+  stroke: #e3e9f0;
+  stroke-width: 0.35;
+}
+
+.history-chart polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.history-chart .value-line {
+  stroke: var(--green);
+}
+
+.history-chart .cost-line {
+  stroke: #d19a18;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chart-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.value-swatch {
+  background: var(--green);
+}
+
+.cost-swatch {
+  background: #d19a18;
+}
+
+.cash-flow-body {
+  display: grid;
+  gap: 16px;
+}
+
+.cash-flow-form {
+  display: grid;
+  grid-template-columns: 150px 150px 160px minmax(160px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.cash-flow-list {
+  display: grid;
+  gap: 8px;
+}
+
+.cash-flow-row {
+  display: grid;
+  grid-template-columns: 130px 140px minmax(160px, 1fr) 38px;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfd;
+  font-size: 13px;
+}
+
+.cash-flow-row span {
+  font-weight: 800;
+}
+
+.cash-flow-row small {
+  color: var(--muted);
 }
 
 .analytics-layout {
@@ -946,6 +1088,14 @@ label {
   .portfolio-bar-row {
     grid-template-columns: 30px 96px minmax(120px, 1fr) 62px 104px;
   }
+
+  .cash-flow-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cash-flow-form button {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 720px) {
@@ -985,6 +1135,19 @@ label {
 
   .projection-row {
     grid-template-columns: 48px minmax(120px, 1fr) 96px;
+  }
+
+  .range-tabs {
+    justify-content: flex-start;
+  }
+
+  .history-chart {
+    height: 210px;
+  }
+
+  .cash-flow-form,
+  .cash-flow-row {
+    grid-template-columns: 1fr;
   }
 
   .risk-head {

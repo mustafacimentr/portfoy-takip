@@ -14,6 +14,8 @@ export async function PUT(request: Request) {
   await writePortfolio({
     assets: Array.isArray(body.state?.assets) ? body.state.assets : [],
     transactions: Array.isArray(body.state?.transactions) ? body.state.transactions : [],
+    history: Array.isArray(body.state?.history) ? body.state.history : [],
+    cashFlows: Array.isArray(body.state?.cashFlows) ? body.state.cashFlows : [],
     settings: body.state?.settings || { autoRefresh: true },
   });
   return Response.json({ ok: true });

@@ -33,15 +33,37 @@ type Transaction = {
   note: string;
 };
 
+type PortfolioSnapshot = {
+  id: string;
+  date: string;
+  totalValue: number;
+  totalCost: number;
+  cash: number;
+  profitLoss: number;
+  assetCount: number;
+};
+
+type CashFlow = {
+  id: string;
+  date: string;
+  type: "deposit" | "withdrawal";
+  amount: number;
+  note: string;
+};
+
 type PortfolioState = {
   assets: Asset[];
   transactions: Transaction[];
+  history: PortfolioSnapshot[];
+  cashFlows: CashFlow[];
   settings: { autoRefresh: boolean };
 };
 
 const emptyState: PortfolioState = {
   assets: [],
   transactions: [],
+  history: [],
+  cashFlows: [],
   settings: { autoRefresh: true },
 };
 
@@ -67,9 +89,17 @@ const knownNames: Record<string, { name: string; type?: string; source?: string;
 const types = ["Hisse", "Fon", "Kripto", "Doviz", "Altin", "Nakit", "Diger"];
 const menuItems = [
   { key: "distribution", label: "Portfoy Dagilimi", description: "Varlik sinifi, toplam paylar ve mevcut varlik listen." },
+  { key: "performance", label: "Performans Gecmisi", description: "Portfoy degerinin zaman icindeki degisimi ve nakit akisi." },
   { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
   { key: "analytics", label: "Portfoy Analitigi", description: "Sinif dengesi, en iyi ve en zayif performanslar." },
   { key: "risk", label: "Risk & Cesitlilik Notu", description: "Yogunlasma, cesitlilik ve stratejik denge ozeti." },
+] as const;
+const rangeOptions = [
+  { key: "7d", label: "1 Hafta", days: 7 },
+  { key: "1m", label: "1 Ay", days: 31 },
+  { key: "3m", label: "3 Ay", days: 93 },
+  { key: "1y", label: "1 Yil", days: 366 },
+  { key: "all", label: "Tum Zamanlar", days: 0 },
 ] as const;
 const groupDefinitions = [
   { key: "precious", label: "Degerli Madenler" },
@@ -221,6 +251,40 @@ function signedMoney(value: number) {
   return `${value >= 0 ? "+" : ""}${money(value)}`;
 }
 
+function plainDate(value = new Date()) {
+  return value.toISOString().slice(0, 10);
+}
+
+function totalsFromAssets(assets: Asset[]) {
+  const totalValue = assets.reduce((sum, a) => sum + a.quantity * a.price * (a.fxRate || 1), 0);
+  const totalCost = assets.reduce((sum, a) => sum + a.quantity * a.avgCost * (a.fxRate || 1), 0);
+  const cash = assets.filter((a) => a.type === "Nakit").reduce((sum, a) => sum + a.quantity * a.price, 0);
+  const profitLoss = totalValue - totalCost;
+  return { totalValue, totalCost, cash, profitLoss, rate: totalCost ? (profitLoss / totalCost) * 100 : 0 };
+}
+
+function normalizeSnapshot(snapshot: Partial<PortfolioSnapshot>): PortfolioSnapshot {
+  return {
+    id: snapshot.id || uid(),
+    date: snapshot.date || plainDate(),
+    totalValue: Number(snapshot.totalValue || 0),
+    totalCost: Number(snapshot.totalCost || 0),
+    cash: Number(snapshot.cash || 0),
+    profitLoss: Number(snapshot.profitLoss || 0),
+    assetCount: Number(snapshot.assetCount || 0),
+  };
+}
+
+function normalizeCashFlow(flow: Partial<CashFlow>): CashFlow {
+  return {
+    id: flow.id || uid(),
+    date: flow.date || plainDate(),
+    type: flow.type === "withdrawal" ? "withdrawal" : "deposit",
+    amount: Number(flow.amount || 0),
+    note: flow.note || "",
+  };
+}
+
 function absoluteMoney(value: number) {
   return money(Math.abs(value));
 }
@@ -326,7 +390,9 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [activeTab, setActiveTab] = useState<(typeof menuItems)[number]["key"]>("distribution");
+  const [historyRange, setHistoryRange] = useState<(typeof rangeOptions)[number]["key"]>("1m");
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
+  const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [lastSync, setLastSync] = useState("");
 
   useEffect(() => {
@@ -353,12 +419,57 @@ export default function Home() {
   }, [passcode, state.assets, state.settings.autoRefresh]);
 
   const totals = useMemo(() => {
-    const totalValue = state.assets.reduce((sum, a) => sum + a.quantity * a.price * (a.fxRate || 1), 0);
-    const totalCost = state.assets.reduce((sum, a) => sum + a.quantity * a.avgCost * (a.fxRate || 1), 0);
-    const cash = state.assets.filter((a) => a.type === "Nakit").reduce((sum, a) => sum + a.quantity * a.price, 0);
-    const pl = totalValue - totalCost;
-    return { totalValue, totalCost, cash, pl, rate: totalCost ? (pl / totalCost) * 100 : 0 };
+    const calculated = totalsFromAssets(state.assets);
+    return { totalValue: calculated.totalValue, totalCost: calculated.totalCost, cash: calculated.cash, pl: calculated.profitLoss, rate: calculated.rate };
   }, [state.assets]);
+
+  const historySeries = useMemo(() => {
+    const todayTotals = totalsFromAssets(state.assets);
+    const todaySnapshot = normalizeSnapshot({
+      id: `live-${plainDate()}`,
+      date: plainDate(),
+      totalValue: todayTotals.totalValue,
+      totalCost: todayTotals.totalCost,
+      cash: todayTotals.cash,
+      profitLoss: todayTotals.profitLoss,
+      assetCount: state.assets.length,
+    });
+    const byDate = new Map<string, PortfolioSnapshot>();
+    [...state.history.map(normalizeSnapshot), todaySnapshot].forEach((snapshot) => byDate.set(snapshot.date, snapshot));
+    const sorted = Array.from(byDate.values()).sort((left, right) => left.date.localeCompare(right.date));
+    const selected = rangeOptions.find((item) => item.key === historyRange) || rangeOptions[1];
+    if (!selected.days) return sorted;
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() - selected.days + 1);
+    const cutoff = plainDate(minDate);
+    return sorted.filter((snapshot) => snapshot.date >= cutoff);
+  }, [state.assets, state.history, historyRange]);
+
+  const performanceStats = useMemo(() => {
+    const first = historySeries[0];
+    const latest = historySeries[historySeries.length - 1];
+    const periodChange = latest && first ? latest.totalValue - first.totalValue : 0;
+    const rangeStart = first?.date || plainDate();
+    const netCashFlow = state.cashFlows
+      .map(normalizeCashFlow)
+      .filter((flow) => flow.date >= rangeStart)
+      .reduce((sum, flow) => sum + (flow.type === "deposit" ? flow.amount : -flow.amount), 0);
+    const investmentGain = periodChange - netCashFlow;
+    const high = historySeries.reduce((max, item) => Math.max(max, item.totalValue), latest?.totalValue || 0);
+    const low = historySeries.reduce((min, item) => Math.min(min, item.totalValue), latest?.totalValue || 0);
+    const monthStart = `${plainDate().slice(0, 7)}-01`;
+    const monthBase = [...historySeries].reverse().find((item) => item.date <= monthStart) || historySeries.find((item) => item.date >= monthStart) || first;
+    const monthChange = latest && monthBase ? latest.totalValue - monthBase.totalValue : 0;
+    return { first, latest, periodChange, netCashFlow, investmentGain, high, low, monthChange };
+  }, [historySeries, state.cashFlows]);
+
+  const chartBounds = useMemo(() => {
+    const values = historySeries.flatMap((item) => [item.totalValue, item.totalCost]);
+    const min = Math.min(...values, 0);
+    const max = Math.max(...values, 1);
+    const padding = Math.max((max - min) * 0.08, 1);
+    return { min: Math.max(0, min - padding), max: max + padding };
+  }, [historySeries]);
 
   const filteredAssets = useMemo(() => {
     return state.assets
@@ -492,18 +603,41 @@ export default function Home() {
     setState({
       assets: (data.state.assets || []).map(normalizeAsset),
       transactions: data.state.transactions || [],
+      history: (data.state.history || []).map(normalizeSnapshot),
+      cashFlows: (data.state.cashFlows || []).map(normalizeCashFlow),
       settings: data.state.settings || { autoRefresh: true },
     });
     setLastSync(new Date().toISOString());
   }
 
-  async function savePortfolio(nextState: PortfolioState) {
-    setState(nextState);
+  function withTodaySnapshot(nextState: PortfolioState) {
+    const calculated = totalsFromAssets(nextState.assets);
+    if (!nextState.assets.length) return { ...nextState, history: nextState.history || [], cashFlows: nextState.cashFlows || [] };
+    const today = plainDate();
+    const snapshot = normalizeSnapshot({
+      id: `snapshot-${today}`,
+      date: today,
+      totalValue: calculated.totalValue,
+      totalCost: calculated.totalCost,
+      cash: calculated.cash,
+      profitLoss: calculated.profitLoss,
+      assetCount: nextState.assets.length,
+    });
+    const history = [...(nextState.history || []).map(normalizeSnapshot).filter((item) => item.date !== today), snapshot]
+      .sort((left, right) => left.date.localeCompare(right.date))
+      .slice(-730);
+    return { ...nextState, history, cashFlows: (nextState.cashFlows || []).map(normalizeCashFlow) };
+  }
+
+  async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean } = {}) {
+    const shouldSnapshot = options.snapshot !== false;
+    const finalState = shouldSnapshot ? withTodaySnapshot(nextState) : nextState;
+    setState(finalState);
     setSaving(true);
     try {
       await api("/api/portfolio", passcode, {
         method: "PUT",
-        body: JSON.stringify({ state: nextState }),
+        body: JSON.stringify({ state: finalState }),
       });
       setLastSync(new Date().toISOString());
     } finally {
@@ -705,6 +839,8 @@ export default function Home() {
     return {
       assets: (data.assets || []).map(normalizeAsset),
       transactions: data.transactions || [],
+      history: (data.history || []).map(normalizeSnapshot),
+      cashFlows: (data.cashFlows || []).map(normalizeCashFlow),
       settings: data.settings || { autoRefresh: true },
     };
   }
@@ -737,7 +873,7 @@ export default function Home() {
     }).filter((asset) => asset.ticker && asset.quantity > 0);
 
     if (!assets.length) throw new Error("CSV dosyasinda aktarilacak varlik bulunamadi");
-    return { assets, transactions: [], settings: { autoRefresh: true } };
+    return { assets, transactions: [], history: [], cashFlows: [], settings: { autoRefresh: true } };
   }
 
   function normalizeHeader(value: string) {
@@ -786,6 +922,46 @@ export default function Home() {
     row.push(cell);
     if (row.some((value) => value.trim())) rows.push(row);
     return rows;
+  }
+
+  async function submitCashFlow(event: FormEvent) {
+    event.preventDefault();
+    const amount = parseAmount(cashDraft.amount);
+    if (amount <= 0) {
+      alert("Lutfen gecerli bir tutar gir.");
+      return;
+    }
+    const flow = normalizeCashFlow({
+      id: uid(),
+      date: cashDraft.date,
+      type: cashDraft.type,
+      amount,
+      note: cashDraft.note,
+    });
+    await savePortfolio({ ...state, cashFlows: [...state.cashFlows, flow] });
+    setCashDraft({ type: "deposit", amount: "", date: plainDate(), note: "" });
+  }
+
+  async function deleteCashFlow(id: string) {
+    await savePortfolio({ ...state, cashFlows: state.cashFlows.filter((flow) => flow.id !== id) });
+  }
+
+  function chartPoints(key: "totalValue" | "totalCost") {
+    if (historySeries.length === 1) {
+      const y = chartY(historySeries[0][key]);
+      return `0,${y} 100,${y}`;
+    }
+    return historySeries
+      .map((item, index) => {
+        const x = (index / Math.max(historySeries.length - 1, 1)) * 100;
+        return `${x},${chartY(item[key])}`;
+      })
+      .join(" ");
+  }
+
+  function chartY(value: number) {
+    const range = Math.max(chartBounds.max - chartBounds.min, 1);
+    return 92 - ((value - chartBounds.min) / range) * 84;
   }
 
   function exportBackup() {
@@ -958,6 +1134,87 @@ export default function Home() {
               ))}
             </div>
           </section>
+        ) : null}
+
+        {activeTab === "performance" ? (
+          <>
+            <section className="insights-grid performance-kpis">
+              <article className="insight-card"><span>Donem baslangici</span><strong>{money(performanceStats.first?.totalValue || totals.totalValue)}</strong></article>
+              <article className={performanceStats.periodChange >= 0 ? "insight-card green" : "insight-card red"}><span>Donem degisimi</span><TrendValue trend={performanceStats.periodChange}>{signedMoney(performanceStats.periodChange)}</TrendValue></article>
+              <article className={performanceStats.investmentGain >= 0 ? "insight-card green" : "insight-card red"}><span>Yatirim getirisi</span><TrendValue trend={performanceStats.investmentGain}>{signedMoney(performanceStats.investmentGain)}</TrendValue></article>
+              <article className={performanceStats.netCashFlow >= 0 ? "insight-card green" : "insight-card red"}><span>Net nakit akisi</span><TrendValue trend={performanceStats.netCashFlow}>{signedMoney(performanceStats.netCashFlow)}</TrendValue></article>
+              <article className={performanceStats.monthChange >= 0 ? "insight-card green" : "insight-card red"}><span>Bu ay</span><TrendValue trend={performanceStats.monthChange}>{signedMoney(performanceStats.monthChange)}</TrendValue></article>
+            </section>
+
+            <section className="panel visual-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Portfoy Deger Gecmisi</h2>
+                  <p>Guncel deger ve yatirilan ana para cizgileri. Yeni kayitlar bugunden itibaren birikir.</p>
+                </div>
+                <div className="range-tabs">
+                  {rangeOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      className={historyRange === option.key ? "active" : ""}
+                      onClick={() => setHistoryRange(option.key)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="history-chart-wrap">
+                <div className="chart-summary-row">
+                  <span>En yuksek: <strong>{money(performanceStats.high)}</strong></span>
+                  <span>En dusuk: <strong>{money(performanceStats.low)}</strong></span>
+                  <span>Kayit sayisi: <strong>{historySeries.length}</strong></span>
+                </div>
+                <svg className="history-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Portfoy performans grafigi">
+                  <line x1="0" y1="92" x2="100" y2="92" />
+                  <line x1="0" y1="50" x2="100" y2="50" />
+                  <line x1="0" y1="8" x2="100" y2="8" />
+                  <polyline className="cost-line" points={chartPoints("totalCost")} />
+                  <polyline className="value-line" points={chartPoints("totalValue")} />
+                </svg>
+                <div className="chart-legend">
+                  <span><i className="value-swatch" /> Guncel deger</span>
+                  <span><i className="cost-swatch" /> Ana para</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="panel cash-flow-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Nakit Akisi</h2>
+                  <p>Yeni para yatirma ve para cekme kayitlari gercek getiriyi ayirmak icin kullanilir.</p>
+                </div>
+              </div>
+              <div className="cash-flow-body">
+                <form className="cash-flow-form" onSubmit={(event) => void submitCashFlow(event)}>
+                  <select value={cashDraft.type} onChange={(event) => setCashDraft({ ...cashDraft, type: event.target.value as CashFlow["type"] })}>
+                    <option value="deposit">Para yatirma</option>
+                    <option value="withdrawal">Para cekme</option>
+                  </select>
+                  <input className="input" type="date" value={cashDraft.date} onChange={(event) => setCashDraft({ ...cashDraft, date: event.target.value })} />
+                  <input className="input" value={cashDraft.amount} onChange={(event) => setCashDraft({ ...cashDraft, amount: event.target.value })} placeholder="Tutar" />
+                  <input className="input" value={cashDraft.note} onChange={(event) => setCashDraft({ ...cashDraft, note: event.target.value })} placeholder="Not" />
+                  <button className="primary">Kaydet</button>
+                </form>
+                <div className="cash-flow-list">
+                  {state.cashFlows.length ? [...state.cashFlows].map(normalizeCashFlow).sort((left, right) => right.date.localeCompare(left.date)).slice(0, 8).map((flow) => (
+                    <div className="cash-flow-row" key={flow.id}>
+                      <span className={flow.type === "deposit" ? "positive" : "negative"}>{flow.type === "deposit" ? "Para yatirma" : "Para cekme"}</span>
+                      <strong>{money(flow.amount)}</strong>
+                      <small>{flow.date}{flow.note ? ` · ${flow.note}` : ""}</small>
+                      <button className="icon-btn" onClick={() => void deleteCashFlow(flow.id)} title="Sil">×</button>
+                    </div>
+                  )) : <div className="empty">Henuz nakit akisi kaydi yok. Ilk kayit sonraki performans hesaplarini daha dogru yapar.</div>}
+                </div>
+              </div>
+            </section>
+          </>
         ) : null}
 
         {activeTab === "projection" ? (

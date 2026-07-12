@@ -3,12 +3,16 @@ import { env } from "cloudflare:workers";
 export type PortfolioState = {
   assets: unknown[];
   transactions: unknown[];
+  history?: unknown[];
+  cashFlows?: unknown[];
   settings: { autoRefresh: boolean };
 };
 
 export const defaultState: PortfolioState = {
   assets: [],
   transactions: [],
+  history: [],
+  cashFlows: [],
   settings: { autoRefresh: true },
 };
 

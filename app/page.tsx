@@ -1468,7 +1468,14 @@ export default function Home() {
   }
 
   function printPortfolioReport() {
-    window.setTimeout(() => window.print(), 50);
+    const previousTitle = document.title;
+    document.title = " ";
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(() => {
+        document.title = previousTitle;
+      }, 500);
+    }, 50);
   }
 
   if (!authChecked || (!passcode && loading && !authError)) {
@@ -2137,7 +2144,7 @@ export default function Home() {
         </section>
 
         <section className="print-report" aria-label="PDF portfoy raporu">
-          <section className="report-page">
+          <section className="report-page assets-page">
             <div className="report-hero">
               <div>
                 <span>Portfoy Takip</span>

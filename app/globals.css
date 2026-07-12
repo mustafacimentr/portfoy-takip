@@ -1798,11 +1798,12 @@ label {
 @media print {
   @page {
     size: A4;
-    margin: 12mm;
+    margin: 9mm;
   }
 
   body {
     background: white;
+    font-family: Arial, Helvetica, sans-serif;
   }
 
   .sidebar,
@@ -1823,7 +1824,7 @@ label {
   .print-report {
     display: block;
     color: #10243f;
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   .print-report-head {
@@ -1988,13 +1989,13 @@ label {
   .print-report {
     display: block !important;
     color: var(--ink);
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   .report-page {
-    break-after: page;
-    page-break-after: always;
-    padding: 0;
+    break-after: auto;
+    page-break-after: auto;
+    padding: 0 0 10px;
   }
 
   .report-page:last-child {
@@ -2008,13 +2009,13 @@ label {
     gap: 24px;
     align-items: flex-end;
     border-bottom: 2px solid #10243f;
-    padding-bottom: 14px;
-    margin-bottom: 14px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
   }
 
   .report-hero.compact {
     align-items: flex-start;
-    margin-bottom: 18px;
+    margin-bottom: 10px;
   }
 
   .report-hero span,
@@ -2029,7 +2030,7 @@ label {
 
   .report-hero h1 {
     margin: 4px 0;
-    font-size: 25px;
+    font-size: 22px;
     line-height: 1.05;
   }
 
@@ -2046,8 +2047,8 @@ label {
   .report-insights {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 9px;
-    margin-bottom: 12px;
+    gap: 7px;
+    margin-bottom: 8px;
   }
 
   .report-insights {
@@ -2065,8 +2066,8 @@ label {
 
   .report-cards article,
   .report-insights article {
-    min-height: 72px;
-    padding: 11px;
+    min-height: 58px;
+    padding: 8px 9px;
     border-top: 3px solid #cbd5df;
   }
 
@@ -2087,8 +2088,8 @@ label {
   .report-insights strong,
   .report-insights .trend-value {
     display: flex;
-    margin-top: 7px;
-    font-size: 17px;
+    margin-top: 5px;
+    font-size: 15px;
   }
 
   .report-cards small,
@@ -2099,14 +2100,19 @@ label {
   }
 
   .report-panel {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     overflow: hidden;
     break-inside: avoid;
   }
 
+  .assets-page .report-panel {
+    break-inside: auto;
+    overflow: visible;
+  }
+
   .report-panel-head {
     border-bottom: 1px solid var(--line);
-    padding: 12px 14px;
+    padding: 9px 12px;
   }
 
   .report-panel-head h2 {
@@ -2120,29 +2126,35 @@ label {
   }
 
   .print-report .class-stack {
-    margin: 14px;
-    height: 19px;
+    margin: 12px;
+    height: 18px;
   }
 
   .print-report .legend-grid {
-    padding: 0 14px 14px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 12px 12px;
   }
 
   .print-report .legend-item {
-    min-width: 95px;
+    width: auto !important;
+    min-width: 0;
+    white-space: nowrap;
+    font-size: 9px;
   }
 
   .print-report .portfolio-bars {
-    padding: 12px 14px;
-    gap: 6px;
+    padding: 9px 12px;
+    gap: 4px;
     overflow: visible;
   }
 
   .print-report .portfolio-bar-row {
-    grid-template-columns: 28px 86px minmax(140px, 1fr) 58px 92px;
+    grid-template-columns: 24px 78px minmax(130px, 1fr) 52px 82px;
     min-width: 0;
-    gap: 8px;
-    font-size: 10px;
+    gap: 7px;
+    font-size: 9px;
   }
 
   .print-report .asset-logo {
@@ -2159,13 +2171,13 @@ label {
     width: 100%;
     min-width: 0;
     border-collapse: collapse;
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .report-table th,
   .report-table td {
     border-bottom: 1px solid var(--line);
-    padding: 7px 8px;
+    padding: 5px 6px;
     text-align: right;
   }
 
@@ -2196,20 +2208,21 @@ label {
   }
 
   .print-report .projection-list {
-    padding: 18px;
+    padding: 12px;
   }
 
   .print-report .projection-row {
     grid-template-columns: 56px minmax(260px, 1fr) 110px;
+    min-height: 24px;
     break-inside: avoid;
   }
 
   .print-report .analytics-layout {
-    padding: 18px;
+    padding: 12px;
   }
 
   .print-report .callout-grid {
-    padding: 0 18px 18px;
+    padding: 0 12px 12px;
   }
 
   .print-report .risk-panel {
@@ -2218,11 +2231,11 @@ label {
   }
 
   .print-report .risk-head {
-    padding: 18px 18px 8px;
+    padding: 12px 12px 6px;
   }
 
   .print-report .risk-grid {
-    padding: 8px 18px 18px;
+    padding: 6px 12px 12px;
   }
 
   .print-report .risk-grid article {

@@ -212,6 +212,11 @@ function pct(value: number) {
   return `%${Number(value || 0).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
 }
 
+function signedPct(value: number) {
+  const formatted = Number(Math.abs(value) || 0).toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+  return `${value >= 0 ? "+" : "-"}%${formatted}`;
+}
+
 function signedMoney(value: number) {
   return `${value >= 0 ? "+" : ""}${money(value)}`;
 }
@@ -1041,7 +1046,7 @@ export default function Home() {
             <table>
               <thead>
                 <tr>
-                  <th>Varlik</th><th>Adet</th><th>Toplam Maliyet</th><th>Guncel</th><th>Deger</th><th>K/Z</th><th>Pay</th><th />
+                  <th>Varlik</th><th>Adet</th><th>Toplam Maliyet</th><th>Guncel</th><th>Deger</th><th>K/Z</th><th>K/Z %</th><th />
                 </tr>
               </thead>
               <tbody>
@@ -1049,7 +1054,7 @@ export default function Home() {
                   const value = asset.quantity * asset.price * (asset.fxRate || 1);
                   const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
                   const pl = value - cost;
-                  const share = totals.totalValue ? (value / totals.totalValue) * 100 : 0;
+                  const plRate = cost ? (pl / cost) * 100 : 0;
                   const previous = filteredAssets[index - 1];
                   const currentGroupKey = assetGroupKey(asset);
                   const showGroup = !previous || assetGroupKey(previous) !== currentGroupKey;
@@ -1083,7 +1088,7 @@ export default function Home() {
                       <td>{money(asset.price, asset.currency)}</td>
                       <td>{money(value)}</td>
                       <td className={pl >= 0 ? "positive" : "negative"}>{money(pl)}</td>
-                      <td>{pct(share)}</td>
+                      <td><span className={pl >= 0 ? "performance-badge positive" : "performance-badge negative"}>{signedPct(plRate)}</span></td>
                       <td className="row-actions">
                         <button className="icon-btn" onClick={() => openAsset(asset)} title="Duzenle">✎</button>
                         <button className="icon-btn" onClick={() => void deleteAsset(asset.id)} title="Sil">×</button>

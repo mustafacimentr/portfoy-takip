@@ -51,6 +51,15 @@ type CashFlow = {
   note: string;
 };
 
+type BenchmarkPoint = {
+  id: string;
+  code: string;
+  date: string;
+  price: number;
+  source: string;
+  symbol: string;
+};
+
 type PortfolioSettings = {
   autoRefresh: boolean;
   targetAllocations: Record<string, number>;
@@ -62,6 +71,7 @@ type PortfolioState = {
   transactions: Transaction[];
   history: PortfolioSnapshot[];
   cashFlows: CashFlow[];
+  benchmarkHistory: BenchmarkPoint[];
   settings: PortfolioSettings;
 };
 
@@ -86,6 +96,7 @@ const emptyState: PortfolioState = {
   transactions: [],
   history: [],
   cashFlows: [],
+  benchmarkHistory: [],
   settings: defaultSettings,
 };
 
@@ -113,6 +124,7 @@ const menuItems = [
   { key: "distribution", label: "Portfoy Dagilimi", description: "Varlik sinifi, toplam paylar ve mevcut varlik listen." },
   { key: "performance", label: "Performans Gecmisi", description: "Portfoy degerinin zaman icindeki degisimi ve nakit akisi." },
   { key: "targets", label: "Hedef Portfoy", description: "Hedef oranlar, sapmalar ve yeni yatirim dagitim onerisi." },
+  { key: "comparison", label: "Karsilastirma", description: "Portfoy getirini BIST, altin, doviz, Bitcoin ve global endekslerle karsilastir." },
   { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
   { key: "analytics", label: "Portfoy Analitigi", description: "Sinif dengesi, en iyi ve en zayif performanslar." },
   { key: "risk", label: "Risk & Cesitlilik Notu", description: "Yogunlasma, cesitlilik ve stratejik denge ozeti." },
@@ -145,6 +157,15 @@ const groupColors: Record<string, string> = {
 };
 const preciousCodes = new Set(["ALTINS1", "ALTIN", "GMSTRF", "GMSTR"]);
 const fundCodes = new Set(["TGE", "TMG", "KPH"]);
+const benchmarkDefinitions = [
+  { code: "portfolio", label: "Portfoy", source: "internal", symbol: "PORTFOY", color: "#10243f" },
+  { code: "bist100", label: "BIST 100", source: "yahoo", symbol: "XU100.IS", color: "#193a6a" },
+  { code: "gold", label: "Altin (ALTIN.S1)", source: "tradingview", symbol: "ALTINS1", color: "#d19a18" },
+  { code: "usdtry", label: "Dolar/TL", source: "yahoo", symbol: "USDTRY=X", color: "#12805c" },
+  { code: "eurtry", label: "Euro/TL", source: "yahoo", symbol: "EURTRY=X", color: "#3f7f8f" },
+  { code: "btctry", label: "Bitcoin/TL", source: "binance", symbol: "BTCTRY", color: "#18b884" },
+  { code: "sp500", label: "S&P 500", source: "yahoo", symbol: "^GSPC", color: "#7557d6" },
+];
 const cryptoLogoUrls: Record<string, string> = {
   BTC: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
   LINK: "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png",
@@ -305,6 +326,17 @@ function normalizeCashFlow(flow: Partial<CashFlow>): CashFlow {
     type: flow.type === "withdrawal" ? "withdrawal" : "deposit",
     amount: Number(flow.amount || 0),
     note: flow.note || "",
+  };
+}
+
+function normalizeBenchmarkPoint(point: Partial<BenchmarkPoint>): BenchmarkPoint {
+  return {
+    id: point.id || uid(),
+    code: point.code || "",
+    date: point.date || plainDate(),
+    price: Number(point.price || 0),
+    source: point.source || "",
+    symbol: point.symbol || "",
   };
 }
 
@@ -503,6 +535,48 @@ export default function Home() {
     return { first, latest, periodChange, periodDeposits, periodWithdrawals, netCashFlow, investmentGain, realReturnRate, high, low, monthChange };
   }, [historySeries, state.cashFlows]);
 
+  const comparisonRows = useMemo(() => {
+    const portfolioStart = performanceStats.first?.totalValue || totals.totalValue;
+    const portfolioEnd = performanceStats.latest?.totalValue || totals.totalValue;
+    const portfolioReturn = portfolioStart ? ((portfolioEnd - portfolioStart - performanceStats.netCashFlow) / Math.max(portfolioStart + performanceStats.periodDeposits, 1)) * 100 : 0;
+    const selected = rangeOptions.find((item) => item.key === historyRange) || rangeOptions[1];
+    const cutoffDate = historySeries[0]?.date || plainDate();
+
+    return benchmarkDefinitions.map((benchmark) => {
+      if (benchmark.code === "portfolio") {
+        return {
+          ...benchmark,
+          firstPrice: portfolioStart,
+          latestPrice: portfolioEnd,
+          returnRate: portfolioReturn,
+          difference: 0,
+          points: historySeries.length,
+          lastDate: performanceStats.latest?.date || plainDate(),
+        };
+      }
+      const points = state.benchmarkHistory
+        .map(normalizeBenchmarkPoint)
+        .filter((point) => point.code === benchmark.code && (!selected.days || point.date >= cutoffDate))
+        .sort((left, right) => left.date.localeCompare(right.date));
+      const first = points[0];
+      const latest = points[points.length - 1];
+      const returnRate = first?.price && latest?.price ? ((latest.price - first.price) / first.price) * 100 : 0;
+      return {
+        ...benchmark,
+        firstPrice: first?.price || 0,
+        latestPrice: latest?.price || 0,
+        returnRate,
+        difference: portfolioReturn - returnRate,
+        points: points.length,
+        lastDate: latest?.date || "",
+      };
+    });
+  }, [historyRange, historySeries, performanceStats, state.benchmarkHistory, totals.totalValue]);
+
+  const benchmarkLeader = useMemo(() => {
+    return [...comparisonRows].filter((row) => row.latestPrice > 0 || row.code === "portfolio").sort((left, right) => right.returnRate - left.returnRate)[0];
+  }, [comparisonRows]);
+
   const cashFlowSummary = useMemo(() => {
     const flows = state.cashFlows.map(normalizeCashFlow);
     const totalDeposits = flows.filter((flow) => flow.type === "deposit").reduce((sum, flow) => sum + flow.amount, 0);
@@ -695,6 +769,7 @@ export default function Home() {
       transactions: data.state.transactions || [],
       history: (data.state.history || []).map(normalizeSnapshot),
       cashFlows: (data.state.cashFlows || []).map(normalizeCashFlow),
+      benchmarkHistory: (data.state.benchmarkHistory || []).map(normalizeBenchmarkPoint),
       settings: normalizeSettings(data.state.settings),
     });
     setLastSync(new Date().toISOString());
@@ -703,7 +778,13 @@ export default function Home() {
   function withTodaySnapshot(nextState: PortfolioState) {
     const calculated = totalsFromAssets(nextState.assets);
     if (!nextState.assets.length) {
-      return { ...nextState, history: nextState.history || [], cashFlows: nextState.cashFlows || [], settings: normalizeSettings(nextState.settings) };
+      return {
+        ...nextState,
+        history: nextState.history || [],
+        cashFlows: nextState.cashFlows || [],
+        benchmarkHistory: (nextState.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+        settings: normalizeSettings(nextState.settings),
+      };
     }
     const today = plainDate();
     const snapshot = normalizeSnapshot({
@@ -718,7 +799,13 @@ export default function Home() {
     const history = [...(nextState.history || []).map(normalizeSnapshot).filter((item) => item.date !== today), snapshot]
       .sort((left, right) => left.date.localeCompare(right.date))
       .slice(-730);
-    return { ...nextState, history, cashFlows: (nextState.cashFlows || []).map(normalizeCashFlow), settings: normalizeSettings(nextState.settings) };
+    return {
+      ...nextState,
+      history,
+      cashFlows: (nextState.cashFlows || []).map(normalizeCashFlow),
+      benchmarkHistory: (nextState.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+      settings: normalizeSettings(nextState.settings),
+    };
   }
 
   async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean } = {}) {
@@ -751,7 +838,8 @@ export default function Home() {
         }
       }),
     );
-    await savePortfolio({ ...state, assets: updated });
+    const benchmarkHistory = await collectBenchmarkHistory(state.benchmarkHistory);
+    await savePortfolio({ ...state, assets: updated, benchmarkHistory });
     setLoading(false);
   }
 
@@ -781,6 +869,54 @@ export default function Home() {
     }
     const url = `/api/price?source=${encodeURIComponent(source)}&symbol=${encodeURIComponent(symbol)}`;
     return api<{ price: number }>(url, passcode);
+  }
+
+  async function fetchBenchmarkPrice(benchmark: (typeof benchmarkDefinitions)[number]) {
+    if (benchmark.source === "binance") return fetchBrowserCryptoPrice(benchmark.symbol);
+    const url = `/api/price?source=${encodeURIComponent(benchmark.source)}&symbol=${encodeURIComponent(benchmark.symbol)}`;
+    return api<{ price: number; source?: string; symbol?: string }>(url, passcode);
+  }
+
+  async function collectBenchmarkHistory(existingHistory = state.benchmarkHistory) {
+    const today = plainDate();
+    const updates = await Promise.all(
+      benchmarkDefinitions.filter((benchmark) => benchmark.code !== "portfolio").map(async (benchmark) => {
+        try {
+          const result = await fetchBenchmarkPrice(benchmark);
+          const price = Number(result.price);
+          if (!Number.isFinite(price) || price <= 0) return null;
+          return normalizeBenchmarkPoint({
+            id: `${benchmark.code}-${today}`,
+            code: benchmark.code,
+            date: today,
+            price,
+            source: result.source || benchmark.source,
+            symbol: result.symbol || benchmark.symbol,
+          });
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const byKey = new Map<string, BenchmarkPoint>();
+    existingHistory.map(normalizeBenchmarkPoint).forEach((point) => {
+      if (point.code && point.date) byKey.set(`${point.code}-${point.date}`, point);
+    });
+    updates.filter(Boolean).forEach((point) => {
+      if (point) byKey.set(`${point.code}-${point.date}`, point);
+    });
+    return Array.from(byKey.values()).sort((left, right) => `${left.date}-${left.code}`.localeCompare(`${right.date}-${right.code}`)).slice(-3650);
+  }
+
+  async function updateBenchmarksOnly() {
+    if (!passcode) return;
+    setLoading(true);
+    try {
+      const benchmarkHistory = await collectBenchmarkHistory(state.benchmarkHistory);
+      await savePortfolio({ ...state, benchmarkHistory }, { snapshot: false });
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function fetchBrowserCryptoPrice(symbol: string) {
@@ -933,6 +1069,7 @@ export default function Home() {
       transactions: data.transactions || [],
       history: (data.history || []).map(normalizeSnapshot),
       cashFlows: (data.cashFlows || []).map(normalizeCashFlow),
+      benchmarkHistory: (data.benchmarkHistory || []).map(normalizeBenchmarkPoint),
       settings: normalizeSettings(data.settings),
     };
   }
@@ -965,7 +1102,7 @@ export default function Home() {
     }).filter((asset) => asset.ticker && asset.quantity > 0);
 
     if (!assets.length) throw new Error("CSV dosyasinda aktarilacak varlik bulunamadi");
-    return { assets, transactions: [], history: [], cashFlows: [], settings: defaultSettings };
+    return { assets, transactions: [], history: [], cashFlows: [], benchmarkHistory: [], settings: defaultSettings };
   }
 
   function normalizeHeader(value: string) {
@@ -1478,6 +1615,79 @@ export default function Home() {
                     <strong>{money(row.suggestedAmount)}</strong>
                   </div>
                 )) : <div className="empty">Hedefe gore eksik sinif yok. Yeni yatirim icin portfoy zaten dengeli gorunuyor.</div>}
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "comparison" ? (
+          <>
+            <section className="insights-grid comparison-kpis">
+              <article className="insight-card"><span>Secili donem</span><strong>{rangeOptions.find((item) => item.key === historyRange)?.label || "1 Ay"}</strong><small>Portfoy gecmisi baz alinir</small></article>
+              <article className={(comparisonRows[0]?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>Portfoy getirisi</span><TrendValue trend={comparisonRows[0]?.returnRate || 0}>{signedPct(comparisonRows[0]?.returnRate || 0)}</TrendValue><small>Nakit etkisi ayrildi</small></article>
+              <article className="insight-card"><span>En iyi benchmark</span><strong>{benchmarkLeader?.label || "-"}</strong><small>{signedPct(benchmarkLeader?.returnRate || 0)}</small></article>
+              <article className={(comparisonRows[0]?.returnRate || 0) - (benchmarkLeader?.returnRate || 0) >= 0 ? "insight-card green" : "insight-card red"}><span>Lidere fark</span><TrendValue trend={(comparisonRows[0]?.returnRate || 0) - (benchmarkLeader?.returnRate || 0)}>{signedPct((comparisonRows[0]?.returnRate || 0) - (benchmarkLeader?.returnRate || 0))}</TrendValue><small>Yuzde puan</small></article>
+              <article className="insight-card"><span>Kayitli veri</span><strong>{state.benchmarkHistory.length}</strong><small>Benchmark noktasi</small></article>
+            </section>
+
+            <section className="panel comparison-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Benchmark Karsilastirmasi</h2>
+                  <p>Portfoy getirini alternatif piyasalarla ayni donemde yan yana gosterir.</p>
+                </div>
+                <div className="range-tabs">
+                  {rangeOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      className={historyRange === option.key ? "active" : ""}
+                      onClick={() => setHistoryRange(option.key)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="comparison-actions">
+                <button className="primary" onClick={() => void updateBenchmarksOnly()} disabled={loading}>Benchmarklari guncelle</button>
+                <span>Benchmark gecmisi bugunden itibaren birikir; eski donemler icin veri yoksa getiri %0 gorunebilir.</span>
+              </div>
+              <div className="benchmark-grid">
+                {comparisonRows.map((row) => (
+                  <article className={row.returnRate >= 0 ? "benchmark-card positive-card" : "benchmark-card negative-card"} key={row.code}>
+                    <span><i style={{ background: row.color }} />{row.label}</span>
+                    <strong>{signedPct(row.returnRate)}</strong>
+                    <small>{row.code === "portfolio" ? "Gercek portfoy getirisi" : row.points ? `${row.points} kayit · Son ${row.lastDate}` : "Henuz veri yok"}</small>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel visual-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Portfoy - Benchmark Farki</h2>
+                  <p>Pozitif fark portfoyun ilgili benchmarktan daha iyi performans gosterdigini anlatir.</p>
+                </div>
+              </div>
+              <div className="comparison-table-wrap">
+                <table className="comparison-table">
+                  <thead>
+                    <tr><th>Olcut</th><th>Ilk Deger</th><th>Son Deger</th><th>Getiri</th><th>Portfoye Gore Fark</th><th>Durum</th></tr>
+                  </thead>
+                  <tbody>
+                    {comparisonRows.filter((row) => row.code !== "portfolio").map((row) => (
+                      <tr key={row.code}>
+                        <td><span className="benchmark-label"><i style={{ background: row.color }} />{row.label}</span></td>
+                        <td>{row.firstPrice ? num(row.firstPrice) : "-"}</td>
+                        <td>{row.latestPrice ? num(row.latestPrice) : "-"}</td>
+                        <td className={row.returnRate >= 0 ? "positive" : "negative"}>{signedPct(row.returnRate)}</td>
+                        <td className={row.difference >= 0 ? "positive" : "negative"}>{signedPct(row.difference)}</td>
+                        <td><span className={`target-status ${row.difference >= 0 ? "balanced" : "over"}`}>{row.difference >= 0 ? "Onde" : "Geride"}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           </>

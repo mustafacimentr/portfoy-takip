@@ -16,6 +16,7 @@ export async function PUT(request: Request) {
     transactions: Array.isArray(body.state?.transactions) ? body.state.transactions : [],
     history: Array.isArray(body.state?.history) ? body.state.history : [],
     cashFlows: Array.isArray(body.state?.cashFlows) ? body.state.cashFlows : [],
+    benchmarkHistory: Array.isArray(body.state?.benchmarkHistory) ? body.state.benchmarkHistory : [],
     settings: body.state?.settings || { autoRefresh: true },
   });
   return Response.json({ ok: true });

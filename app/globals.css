@@ -869,6 +869,91 @@ select:focus {
   text-align: right;
 }
 
+.comparison-panel {
+  overflow: hidden;
+}
+
+.comparison-actions {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.comparison-actions span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.benchmark-grid {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.benchmark-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 14px;
+  min-height: 112px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.benchmark-card.positive-card {
+  border-color: #a9e7d0;
+  background: #eefaf5;
+}
+
+.benchmark-card.negative-card {
+  border-color: #f3b8b0;
+  background: #fff0ee;
+}
+
+.benchmark-card span,
+.benchmark-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+}
+
+.benchmark-card span {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.benchmark-card i,
+.benchmark-label i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.benchmark-card strong {
+  font-size: 24px;
+}
+
+.benchmark-card small {
+  color: var(--muted);
+}
+
+.comparison-table-wrap {
+  overflow-x: auto;
+}
+
+.comparison-table {
+  min-width: 880px;
+}
+
 .analytics-layout {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
@@ -1269,7 +1354,8 @@ label {
 
   .return-grid,
   .return-breakdown,
-  .target-settings-grid {
+  .target-settings-grid,
+  .benchmark-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1331,7 +1417,8 @@ label {
   .return-grid,
   .return-breakdown,
   .target-settings-grid,
-  .rebalance-row {
+  .rebalance-row,
+  .benchmark-grid {
     grid-template-columns: 1fr;
   }
 

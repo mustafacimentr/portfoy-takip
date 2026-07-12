@@ -5,6 +5,7 @@ function compactBistCode(value: string) {
 }
 
 function yahooSymbol(value: string) {
+  if (String(value || "").includes("=") || String(value || "").startsWith("^")) return value;
   const compact = compactBistCode(value);
   if (compact === "GMSTRF") return "GMSTR.IS";
   return String(value || "").includes(".") ? value : `${compact}.IS`;

@@ -338,6 +338,38 @@ th {
   background: #fbfcfe;
 }
 
+.group-row td {
+  background: #eef3f7;
+  border-top: 1px solid #cfdae6;
+  border-bottom: 1px solid #cfdae6;
+  padding: 10px 14px;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+}
+
+.group-title strong {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.group-title small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.group-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
 .asset-name {
   display: flex;
   align-items: center;

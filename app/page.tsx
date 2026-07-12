@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Asset = {
   id: string;
@@ -64,6 +64,15 @@ const knownNames: Record<string, { name: string; type?: string; source?: string;
 };
 
 const types = ["Hisse", "Fon", "Kripto", "Doviz", "Altin", "Nakit", "Diger"];
+const groupDefinitions = [
+  { key: "Altin", label: "Degerli Madenler" },
+  { key: "Fon", label: "Fonlar" },
+  { key: "Hisse", label: "Hisse Senetleri" },
+  { key: "Kripto", label: "Kriptolar" },
+  { key: "Doviz", label: "Doviz" },
+  { key: "Nakit", label: "Nakit" },
+  { key: "Diger", label: "Diger" },
+];
 const colors = ["#2f6fed", "#12805c", "#bc3d32", "#7557d6", "#c77d0e", "#0f8b8d", "#596579"];
 
 function uid() {
@@ -215,11 +224,36 @@ export default function Home() {
   }, [state.assets]);
 
   const filteredAssets = useMemo(() => {
-    return state.assets.filter((asset) => {
-      const text = `${asset.ticker} ${asset.name}`.toLowerCase();
-      return text.includes(query.toLowerCase()) && (typeFilter === "all" || asset.type === typeFilter);
-    });
+    return state.assets
+      .filter((asset) => {
+        const text = `${asset.ticker} ${asset.name}`.toLowerCase();
+        return text.includes(query.toLowerCase()) && (typeFilter === "all" || asset.type === typeFilter);
+      })
+      .sort((left, right) => {
+        const leftGroup = groupDefinitions.findIndex((group) => group.key === left.type);
+        const rightGroup = groupDefinitions.findIndex((group) => group.key === right.type);
+        if (leftGroup !== rightGroup) return leftGroup - rightGroup;
+        const rightValue = right.quantity * right.price * (right.fxRate || 1);
+        const leftValue = left.quantity * left.price * (left.fxRate || 1);
+        return rightValue - leftValue;
+      });
   }, [state.assets, query, typeFilter]);
+
+  const groupedAssets = useMemo(() => {
+    return groupDefinitions
+      .map((group) => {
+        const assets = filteredAssets
+          .filter((asset) => asset.type === group.key)
+          .sort((left, right) => {
+            const rightValue = right.quantity * right.price * (right.fxRate || 1);
+            const leftValue = left.quantity * left.price * (left.fxRate || 1);
+            return rightValue - leftValue;
+          });
+        const value = assets.reduce((sum, asset) => sum + asset.quantity * asset.price * (asset.fxRate || 1), 0);
+        return { ...group, assets, value };
+      })
+      .filter((group) => group.assets.length > 0);
+  }, [filteredAssets]);
 
   async function login(code = draftPasscode) {
     setAuthError("");
@@ -673,8 +707,23 @@ export default function Home() {
                   const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
                   const pl = value - cost;
                   const share = totals.totalValue ? (value / totals.totalValue) * 100 : 0;
+                  const previous = filteredAssets[index - 1];
+                  const showGroup = !previous || previous.type !== asset.type;
+                  const group = groupedAssets.find((item) => item.key === asset.type);
                   return (
-                    <tr key={asset.id}>
+                    <Fragment key={asset.id}>
+                    {showGroup && group ? (
+                      <tr className="group-row">
+                        <td colSpan={8}>
+                          <div className="group-title">
+                            <span className="group-dot" style={{ background: colors[groupDefinitions.findIndex((item) => item.key === asset.type) % colors.length] }} />
+                            <strong>{group.label}</strong>
+                            <small>{group.assets.length} varlik · {money(group.value)}</small>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                    <tr>
                       <td>
                         <div className="asset-name">
                           <span className="dot" style={{ background: colors[index % colors.length] }} />
@@ -695,6 +744,7 @@ export default function Home() {
                         <button className="icon-btn" onClick={() => void deleteAsset(asset.id)} title="Sil">×</button>
                       </td>
                     </tr>
+                    </Fragment>
                   );
                 }) : (
                   <tr><td colSpan={8}><div className="empty">Ilk varligini ekleyerek baslayabilirsin.</div></td></tr>

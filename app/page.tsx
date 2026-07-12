@@ -2137,6 +2137,162 @@ export default function Home() {
         </section>
 
         <section className="print-report" aria-label="PDF portfoy raporu">
+          <section className="report-page">
+            <div className="report-hero">
+              <div>
+                <span>Portfoy Takip</span>
+                <h1>Portfoy Dagilimi</h1>
+                <p>Rapor tarihi: {new Date().toLocaleDateString("tr-TR")} · Son kayit: {lastSync ? formatTime(lastSync) : "-"}</p>
+              </div>
+              <strong>{money(totals.totalValue)}</strong>
+            </div>
+
+            <div className="report-cards">
+              <article><span>Toplam maliyet</span><strong>{money(totals.totalCost)}</strong><small>Kayitli alis maliyeti</small></article>
+              <article><span>Guncel deger</span><TrendValue trend={totals.pl}>{money(totals.totalValue)}</TrendValue><small>{state.assets.length} varlik</small></article>
+              <article><span>Kar / Zarar</span><TrendValue trend={totals.pl}>{signedMoney(totals.pl)}</TrendValue><small>{pct(totals.rate)}</small></article>
+              <article><span>Nakit</span><strong>{money(totals.cash)}</strong><small>Varlik tipi: Nakit</small></article>
+            </div>
+
+            <div className="report-insights">
+              <article className="gold"><span>Yatirilan ana para</span><strong>{money(totals.totalCost)}</strong></article>
+              <article className={totals.pl >= 0 ? "green" : "red"}><span>Varlik degeri</span><TrendValue trend={totals.pl}>{money(totals.totalValue)}</TrendValue></article>
+              <article className={totals.pl >= 0 ? "green" : "red"}><span>Net durum</span><TrendValue trend={totals.pl}>{signedMoney(totals.pl)}</TrendValue><small>{pct(totals.rate)}</small></article>
+              <article className={(bestAsset?.returnRate || 0) >= 0 ? "green" : "red"}><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"}</strong><small>{bestAsset ? `${pct(bestAsset.returnRate)} · ${absoluteMoney(bestAsset.profitLoss)}` : "%0"}</small></article>
+              <article className={(worstAsset?.returnRate || 0) >= 0 ? "green" : "red"}><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"}</strong><small>{worstAsset ? `${pct(worstAsset.returnRate)} · ${absoluteMoney(worstAsset.profitLoss)}` : "%0"}</small></article>
+            </div>
+
+            <section className="report-panel">
+              <div className="report-panel-head"><h2>Varlik Sinifi Dagilimi</h2><p>Guncel portfoy degerine gore sinif paylari.</p></div>
+              <div className="class-stack" style={{ background: classGradient }} />
+              <div className="legend-grid">
+                {groupedAssets.map((group) => {
+                  const share = totals.totalValue ? (group.value / totals.totalValue) * 100 : 0;
+                  return (
+                    <div key={group.key} className="legend-item" style={{ width: `${share}%` }}>
+                      <span style={{ background: groupColors[group.key] || "#647181" }} />
+                      <strong>{group.label}</strong>
+                      <b>{pct(share)}</b>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="report-panel">
+              <div className="report-panel-head"><h2>Genel Portfoy Dagilimi</h2><p>Varlik bazinda portfoy payi ve guncel deger.</p></div>
+              <div className="portfolio-bars report-bars">
+                {portfolioRows.map((row) => (
+                  <div className="portfolio-bar-row" key={row.asset.id}>
+                    <AssetLogo asset={row.asset} color={row.color} />
+                    <strong>{row.asset.ticker}</strong>
+                    <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, row.share)}%`, background: row.color }} /></div>
+                    <span>{pct(row.share)}</span>
+                    <b>{money(row.value)}</b>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </section>
+
+          <section className="report-page">
+            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Portfoy Varliklari</h1><p>Kategorilere ayrilmis detayli portfoy listesi.</p></div></div>
+            <section className="report-panel">
+              <table className="report-table">
+                <thead><tr><th>Varlik</th><th>Adet</th><th>Toplam Maliyet</th><th>Guncel</th><th>Deger</th><th>K/Z</th><th>K/Z %</th></tr></thead>
+                <tbody>
+                  {filteredAssets.map((asset, index) => {
+                    const value = asset.quantity * asset.price * (asset.fxRate || 1);
+                    const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
+                    const pl = value - cost;
+                    const plRate = cost ? (pl / cost) * 100 : 0;
+                    const previous = filteredAssets[index - 1];
+                    const currentGroupKey = assetGroupKey(asset);
+                    const showGroup = !previous || assetGroupKey(previous) !== currentGroupKey;
+                    const group = groupedAssets.find((item) => item.key === currentGroupKey);
+                    return (
+                      <Fragment key={asset.id}>
+                        {showGroup && group ? <tr className="report-group-row"><td colSpan={7}>{group.label} · {group.assets.length} varlik · Yatirilan {money(group.cost)} · <span className={group.profitLoss >= 0 ? "positive" : "negative"}>{signedMoney(group.profitLoss)}</span></td></tr> : null}
+                        <tr>
+                          <td><strong>{asset.ticker}</strong><small>{asset.name}</small></td>
+                          <td>{num(asset.quantity)}</td>
+                          <td>{money(cost)}</td>
+                          <td>{money(asset.price, asset.currency)}</td>
+                          <td>{money(value)}</td>
+                          <td className={pl >= 0 ? "positive" : "negative"}>{signedMoney(pl)}</td>
+                          <td><span className={pl >= 0 ? "performance-badge positive" : "performance-badge negative"}>{signedPct(plRate)}</span></td>
+                        </tr>
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </section>
+          </section>
+
+          <section className="report-page">
+            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Gelecek Projeksiyonu</h1><p>Bugunku deger uzerine her yil 360.000 TL ek yatirim ve yillik %16 bilesik getiri varsayimi.</p></div></div>
+            <section className="report-panel">
+              <div className="projection-list">
+                {projections.map((item) => (
+                  <div className="projection-row" key={item.year}>
+                    <span>{item.year}. Yil</span>
+                    <div className="bar-track"><div className={item.year === 10 ? "bar-fill accent" : "bar-fill"} style={{ width: `${(item.value / maxProjection) * 100}%` }} /></div>
+                    <strong>{compactMoney(item.value)}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </section>
+
+          <section className="report-page">
+            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Portfoy Analitigi</h1><p>Sinif dengesi, kategori paylari ve performans ozeti.</p></div></div>
+            <section className="report-panel">
+              <div className="analytics-layout">
+                <div className="donut-wrap">
+                  <div className="donut" style={{ background: donutGradient }}><span>Varlik<br />Sinifi</span></div>
+                </div>
+                <div className="analytics-list">
+                  {groupedAssets.map((group) => (
+                    <div className="analytics-line" key={group.key}>
+                      <span style={{ background: groupColors[group.key] || "#647181" }} />
+                      <strong>{group.label}</strong>
+                      <b>{pct(totals.totalValue ? (group.value / totals.totalValue) * 100 : 0)}</b>
+                      <em>{money(group.value)}</em>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="callout-grid">
+                <article className="callout positive-bg"><span>En cok kazandiran</span><strong>{bestAsset?.asset.ticker || "-"}</strong><b>{bestAsset ? `${pct(bestAsset.returnRate)} (${signedMoney(bestAsset.profitLoss)})` : "%0"}</b></article>
+                <article className="callout negative-bg"><span>En cok kaybettiren</span><strong>{worstAsset?.asset.ticker || "-"}</strong><b>{worstAsset ? `${pct(worstAsset.returnRate)} (${signedMoney(worstAsset.profitLoss)})` : "%0"}</b></article>
+              </div>
+            </section>
+          </section>
+
+          <section className="report-page">
+            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Risk & Cesitlilik Notu</h1><p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p></div></div>
+            <section className="report-panel risk-panel">
+              <div className="risk-head">
+                <div>
+                  <h2>Risk & Cesitlilik Notu</h2>
+                  <p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p>
+                </div>
+                <div className="score-row">
+                  <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Genel Risk / 10</span></div>
+                  <div className="score-pill"><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Cesitlilik / 10</span></div>
+                </div>
+              </div>
+              <div className="risk-grid">
+                <article><h3>Dagilim yapisi</h3><p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk pay {portfolioRows[0]?.asset.ticker || "-"} tarafinda ve toplam portfoyun {pct(topShare)} seviyesinde.</p></article>
+                <article><h3>Yogunlasma dengesi</h3><p>Degerli madenler, yatirim fonlari, hisse senetleri ve kripto varliklar ayni ekranda izleniyor. Bu dagilim tek bir varlik turune bagimliligi azaltir.</p></article>
+                <article><h3>Ortusme kontrolu</h3><p>Fonlar ile dogrudan hisse pozisyonlari arasinda kismi ortusme olabilir. En yuksek agirlikli varliklar duzenli izlenirse risk daha net yonetilir.</p></article>
+                <article><h3>Stratejik degerlendirme</h3><p>Portfoy orta riskli, cesitlendirilmis bir yapiya yakindir. Yeni yatirimlarda hedef paylara gore eksik kalan siniflara agirlik vermek dengeyi guclendirir.</p></article>
+              </div>
+            </section>
+          </section>
+
+          <section className="legacy-print-report">
           <div className="print-report-head">
             <div>
               <span>Portfoy Takip</span>
@@ -2203,6 +2359,7 @@ export default function Home() {
             <h2>Risk ve notlar</h2>
             <p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk pozisyon {portfolioRows[0]?.asset.ticker || "-"} ve portfoy payi {pct(topShare)}. Yeni yatirimlarda hedef portfoy ekranindaki eksik siniflar takip edilerek denge guclendirilebilir.</p>
           </section>
+        </section>
         </section>
       </main>
 

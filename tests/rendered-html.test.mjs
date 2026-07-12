@@ -46,6 +46,9 @@ test("performance history screen is wired into the portfolio dashboard", async (
   assert.match(page, /Benchmark Karsilastirmasi/);
   assert.match(page, /Veri Durumu/);
   assert.match(page, /Fiyat Guncelleme Merkezi/);
+  assert.match(page, /PDF raporu/);
+  assert.match(page, /Kisisel Portfoy Raporu/);
+  assert.match(page, /printPortfolioReport/);
   assert.match(page, /selectedAssetDetail/);
   assert.match(page, /Analiz notlari/);
   assert.match(page, /Kategori ici pay/);
@@ -72,6 +75,9 @@ test("performance history screen is wired into the portfolio dashboard", async (
   assert.match(css, /\.source-grid/);
   assert.match(css, /\.data-status-table/);
   assert.match(css, /\.data-status-badge/);
+  assert.match(css, /\.print-report/);
+  assert.match(css, /@media print/);
+  assert.match(css, /\.print-table/);
   assert.match(css, /\.asset-detail-modal/);
   assert.match(css, /\.asset-detail-grid/);
   assert.match(css, /\.range-tabs/);

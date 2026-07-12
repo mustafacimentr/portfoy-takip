@@ -1403,9 +1403,13 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "portfoy-yedek.json";
+    link.download = `portfoy-yedek-${plainDate()}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function printPortfolioReport() {
+    window.setTimeout(() => window.print(), 50);
   }
 
   if (!authChecked || (!passcode && loading && !authError)) {
@@ -1496,6 +1500,7 @@ export default function Home() {
             >
               Oto: {state.settings.autoRefresh ? "Acik" : "Kapali"}
             </button>
+            <button className="secondary" onClick={printPortfolioReport}>PDF raporu</button>
             <button className="secondary" onClick={exportBackup}>Yedek indir</button>
             <label className="file-button">
               Yedek yukle
@@ -2070,6 +2075,75 @@ export default function Home() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section className="print-report" aria-label="PDF portfoy raporu">
+          <div className="print-report-head">
+            <div>
+              <span>Portfoy Takip</span>
+              <h1>Kisisel Portfoy Raporu</h1>
+              <p>Rapor tarihi: {new Date().toLocaleDateString("tr-TR")} · Son kayit: {lastSync ? formatTime(lastSync) : "-"}</p>
+            </div>
+            <strong>{money(totals.totalValue)}</strong>
+          </div>
+
+          <div className="print-kpi-grid">
+            <article><span>Toplam maliyet</span><strong>{money(totals.totalCost)}</strong></article>
+            <article><span>Guncel deger</span><strong>{money(totals.totalValue)}</strong></article>
+            <article><span>Kar / zarar</span><strong className={totals.pl >= 0 ? "positive" : "negative"}>{signedMoney(totals.pl)}</strong><small>{signedPct(totals.rate)}</small></article>
+            <article><span>Nakit</span><strong>{money(totals.cash)}</strong></article>
+          </div>
+
+          <div className="print-two-col">
+            <section>
+              <h2>Varlik sinifi dagilimi</h2>
+              {groupedAssets.map((group) => {
+                const share = totals.totalValue ? (group.value / totals.totalValue) * 100 : 0;
+                return (
+                  <div className="print-bar-row" key={group.key}>
+                    <div><strong>{group.label}</strong><span>{pct(share)} · {money(group.value)}</span></div>
+                    <div className="print-bar-track"><div style={{ width: `${Math.max(2, share)}%`, background: groupColors[group.key] || "#647181" }} /></div>
+                  </div>
+                );
+              })}
+            </section>
+            <section>
+              <h2>Performans ozeti</h2>
+              <div className="print-summary-list">
+                <div><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"} · {bestAsset ? signedPct(bestAsset.returnRate) : "%0"}</strong></div>
+                <div><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"} · {worstAsset ? signedPct(worstAsset.returnRate) : "%0"}</strong></div>
+                <div><span>Risk notu</span><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}/10</strong></div>
+                <div><span>Cesitlilik notu</span><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}/10</strong></div>
+              </div>
+            </section>
+          </div>
+
+          <section className="print-section">
+            <h2>Portfoy varliklari</h2>
+            <table className="print-table">
+              <thead>
+                <tr><th>Varlik</th><th>Tur</th><th>Adet</th><th>Maliyet</th><th>Guncel deger</th><th>K/Z</th><th>K/Z %</th></tr>
+              </thead>
+              <tbody>
+                {portfolioRows.map((row) => (
+                  <tr key={row.asset.id}>
+                    <td>{row.asset.ticker}</td>
+                    <td>{groupDefinitions.find((group) => group.key === assetGroupKey(row.asset))?.label || row.asset.type}</td>
+                    <td>{num(row.asset.quantity)}</td>
+                    <td>{money(row.cost)}</td>
+                    <td>{money(row.value)}</td>
+                    <td className={row.profitLoss >= 0 ? "positive" : "negative"}>{signedMoney(row.profitLoss)}</td>
+                    <td className={row.returnRate >= 0 ? "positive" : "negative"}>{signedPct(row.returnRate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="print-section">
+            <h2>Risk ve notlar</h2>
+            <p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk pozisyon {portfolioRows[0]?.asset.ticker || "-"} ve portfoy payi {pct(topShare)}. Yeni yatirimlarda hedef portfoy ekranindaki eksik siniflar takip edilerek denge guclendirilebilir.</p>
+          </section>
         </section>
       </main>
 

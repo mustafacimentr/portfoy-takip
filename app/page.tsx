@@ -829,13 +829,16 @@ export default function Home() {
             <div className="visual-body">
               <div className="class-stack" style={{ background: classGradient }} />
               <div className="legend-grid">
-                {groupedAssets.map((group) => (
-                  <div key={group.key} className="legend-item">
-                    <span style={{ background: groupColors[group.key] || "#647181" }} />
-                    <strong>{group.label}</strong>
-                    <b>{pct(totals.totalValue ? (group.value / totals.totalValue) * 100 : 0)}</b>
-                  </div>
-                ))}
+                {groupedAssets.map((group) => {
+                  const share = totals.totalValue ? (group.value / totals.totalValue) * 100 : 0;
+                  return (
+                    <div key={group.key} className="legend-item" style={{ width: `${share}%` }}>
+                      <span style={{ background: groupColors[group.key] || "#647181" }} />
+                      <strong>{group.label}</strong>
+                      <b>{pct(share)}</b>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>

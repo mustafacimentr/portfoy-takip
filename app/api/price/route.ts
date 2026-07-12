@@ -79,14 +79,71 @@ async function isPortfoyPrice(symbol: string) {
 }
 
 async function binancePrice(symbol: string) {
-  const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol.toUpperCase())}`, {
-    headers: { "user-agent": "Mozilla/5.0" },
+  const finalSymbol = symbol.toUpperCase();
+  const endpoints = [
+    "https://api.binance.com",
+    "https://api1.binance.com",
+    "https://api2.binance.com",
+    "https://api3.binance.com",
+    "https://data-api.binance.vision",
+  ];
+  let lastError = "Binance fiyati okunamadi";
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(`${endpoint}/api/v3/ticker/price?symbol=${encodeURIComponent(finalSymbol)}`, {
+        headers: { "user-agent": "Mozilla/5.0" },
+      });
+      if (!response.ok) {
+        lastError = `Binance ${response.status}`;
+        continue;
+      }
+      const data = await response.json() as { price?: string };
+      const price = Number(data.price);
+      if (Number.isFinite(price) && price > 0) return { price, source: "Binance", symbol: finalSymbol };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : lastError;
+    }
+  }
+
+  try {
+    return await coinGeckoTryPrice(finalSymbol);
+  } catch (error) {
+    throw new Error(`${lastError}; kripto yedek kaynak da okunamadi`);
+  }
+}
+
+const coinGeckoIds: Record<string, string> = {
+  BTC: "bitcoin",
+  ETH: "ethereum",
+  LINK: "chainlink",
+  RNDR: "render-token",
+  RENDER: "render-token",
+  ONDO: "ondo-finance",
+  ALGO: "algorand",
+  SUI: "sui",
+  XRP: "ripple",
+  NEAR: "near",
+};
+
+function cryptoBaseFromSymbol(symbol: string) {
+  const compact = compactBistCode(symbol);
+  const quote = ["TRY", "USDT", "USD", "EUR"].find((suffix) => compact.endsWith(suffix));
+  return quote ? compact.slice(0, -quote.length) : compact;
+}
+
+async function coinGeckoTryPrice(symbol: string) {
+  const base = cryptoBaseFromSymbol(symbol);
+  const id = coinGeckoIds[base];
+  if (!id) throw new Error(`Kripto yedek kaynakta ${base} tanimli degil`);
+  const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=try`, {
+    headers: { "accept": "application/json", "user-agent": "Mozilla/5.0" },
   });
-  if (!response.ok) throw new Error(`Binance ${response.status}`);
-  const data = await response.json() as { price?: string };
-  const price = Number(data.price);
-  if (!Number.isFinite(price) || price <= 0) throw new Error("Binance fiyati okunamadi");
-  return { price, source: "Binance", symbol: symbol.toUpperCase() };
+  if (!response.ok) throw new Error(`CoinGecko ${response.status}`);
+  const data = await response.json() as Record<string, { try?: number }>;
+  const price = Number(data[id]?.try);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("Kripto yedek fiyat okunamadi");
+  return { price, source: "CoinGecko", symbol: `${base}TRY` };
 }
 
 export async function GET(request: Request) {

@@ -328,14 +328,104 @@ export default function Home() {
   }
 
   async function importBackup(file: File) {
-    const text = await file.text();
+    try {
+      const text = await file.text();
+      const nextState = file.name.toLowerCase().endsWith(".csv")
+        ? parseCsvBackup(text)
+        : parseJsonBackup(text);
+      await savePortfolio(nextState);
+      alert(`${nextState.assets.length} varlik bulut portfoyune aktarildi.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Dosya iceri aktarilamadi.");
+    }
+  }
+
+  function parseJsonBackup(text: string): PortfolioState {
     const data = JSON.parse(text);
-    const nextState = {
+    return {
       assets: (data.assets || []).map(normalizeAsset),
       transactions: data.transactions || [],
       settings: data.settings || { autoRefresh: true },
     };
-    await savePortfolio(nextState);
+  }
+
+  function parseCsvBackup(text: string): PortfolioState {
+    const rows = parseCsvRows(text);
+    if (rows.length < 2) throw new Error("CSV dosyasinda aktarilacak varlik bulunamadi");
+
+    const headers = rows[0].map((header) => normalizeHeader(header));
+    const assets = rows.slice(1).map((row) => {
+      const get = (name: string) => row[headers.indexOf(normalizeHeader(name))] || "";
+      const ticker = get("Kod");
+      const inferred = inferAssetDetails(ticker);
+      return normalizeAsset({
+        id: uid(),
+        ticker,
+        name: get("Ad") || inferred.name,
+        type: get("Tur") || inferred.type,
+        currency: get("Para Birimi") || inferred.currency,
+        fxRate: parseAmount(get("TL Kuru")) || 1,
+        priceSource: get("Fiyat Kaynagi") || inferred.priceSource,
+        priceSymbol: get("API Sembolu") || inferred.priceSymbol,
+        autoUpdate: !["hayir", "false", "0"].includes(get("Oto Guncelleme").trim().toLowerCase()),
+        quantity: parseAmount(get("Adet")),
+        avgCost: parseAmount(get("Ortalama Alis Fiyati")),
+        price: parseAmount(get("Guncel Fiyat")) || parseAmount(get("Ortalama Alis Fiyati")),
+        target: parseAmount(get("Hedef")),
+        note: get("Not"),
+      });
+    }).filter((asset) => asset.ticker && asset.quantity > 0);
+
+    if (!assets.length) throw new Error("CSV dosyasinda aktarilacak varlik bulunamadi");
+    return { assets, transactions: [], settings: { autoRefresh: true } };
+  }
+
+  function normalizeHeader(value: string) {
+    return String(value || "")
+      .trim()
+      .toLocaleLowerCase("tr-TR")
+      .replace(/ı/g, "i")
+      .replace(/ğ/g, "g")
+      .replace(/ü/g, "u")
+      .replace(/ş/g, "s")
+      .replace(/ö/g, "o")
+      .replace(/ç/g, "c")
+      .replace(/\s+/g, " ");
+  }
+
+  function parseCsvRows(text: string) {
+    const firstLine = text.split(/\r?\n/, 1)[0] || "";
+    const delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ";" : ",";
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = "";
+    let quoted = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      const next = text[index + 1];
+      if (char === '"' && quoted && next === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === delimiter && !quoted) {
+        row.push(cell);
+        cell = "";
+      } else if ((char === "\n" || char === "\r") && !quoted) {
+        if (char === "\r" && next === "\n") index += 1;
+        row.push(cell);
+        if (row.some((value) => value.trim())) rows.push(row);
+        row = [];
+        cell = "";
+      } else {
+        cell += char;
+      }
+    }
+
+    row.push(cell);
+    if (row.some((value) => value.trim())) rows.push(row);
+    return rows;
   }
 
   function exportBackup() {
@@ -428,7 +518,7 @@ export default function Home() {
             <button className="secondary" onClick={exportBackup}>Yedek indir</button>
             <label className="file-button">
               Yedek yukle
-              <input type="file" accept="application/json" onChange={(event) => event.target.files?.[0] && void importBackup(event.target.files[0])} />
+              <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(event) => event.target.files?.[0] && void importBackup(event.target.files[0])} />
             </label>
             <button className="primary" onClick={() => openAsset()}>+ Varlik ekle</button>
           </div>

@@ -2147,6 +2147,8 @@ label {
     border-bottom: 2px solid #10243f;
     padding-bottom: 10px;
     margin-bottom: 10px;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .report-hero.compact {
@@ -2241,6 +2243,11 @@ label {
     break-inside: avoid;
   }
 
+  .report-panel-head {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
   .assets-page .report-panel {
     break-inside: auto;
     overflow: visible;
@@ -2290,14 +2297,9 @@ label {
     max-width: 76px;
   }
 
-  .print-report .report-portfolio-panel {
-    break-before: page;
-    page-break-before: always;
-  }
-
   .print-report .portfolio-bars {
     padding: 9px 12px;
-    gap: 4px;
+    gap: 3px;
     overflow: visible;
   }
 
@@ -2316,6 +2318,28 @@ label {
 
   .print-report .bar-track {
     height: 12px;
+  }
+
+  .print-report .report-portfolio-panel {
+    break-before: auto;
+    page-break-before: auto;
+    break-inside: auto;
+    overflow: visible;
+  }
+
+  .print-report .report-portfolio-panel .portfolio-bar-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-report .assets-page {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-report .assets-page .report-hero,
+  .print-report .report-page > .report-hero {
+    margin-top: 0;
   }
 
   .report-table {

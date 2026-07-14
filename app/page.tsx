@@ -645,9 +645,11 @@ export default function Home() {
 
   const chartBounds = useMemo(() => {
     const values = historySeries.flatMap((item) => [item.totalValue, item.totalCost]);
-    const min = Math.min(...values, 0);
-    const max = Math.max(...values, 1);
-    const padding = Math.max((max - min) * 0.08, 1);
+    if (!values.length) return { min: 0, max: 1 };
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const visibleRange = Math.max(max - min, Math.abs(max) * 0.005, 1);
+    const padding = visibleRange * 0.12;
     return { min: Math.max(0, min - padding), max: max + padding };
   }, [historySeries]);
 
@@ -659,7 +661,7 @@ export default function Home() {
       const close = item.totalValue;
       const high = Math.max(open, close);
       const low = Math.min(open, close);
-      const x = historySeries.length === 1 ? 50 : (index / Math.max(historySeries.length - 1, 1)) * 100;
+      const x = historySeries.length === 1 ? 50 : 2 + (index / Math.max(historySeries.length - 1, 1)) * 96;
       const openY = chartY(open);
       const closeY = chartY(close);
       const highY = chartY(high);
@@ -675,8 +677,8 @@ export default function Home() {
         closeY,
         highY,
         lowY,
-        bodyY: Math.min(openY, closeY),
-        bodyHeight: Math.max(Math.abs(closeY - openY), 0.9),
+        bodyY: closeY - 1.2,
+        bodyHeight: 2.4,
         trend: close >= open ? "positive" : "negative",
       };
     });
@@ -1688,7 +1690,7 @@ export default function Home() {
     }
     return historySeries
       .map((item, index) => {
-        const x = (index / Math.max(historySeries.length - 1, 1)) * 100;
+        const x = 2 + (index / Math.max(historySeries.length - 1, 1)) * 96;
         return `${x},${chartY(item[key])}`;
       })
       .join(" ");
@@ -1965,6 +1967,8 @@ export default function Home() {
                   <line x1="0" y1="92" x2="100" y2="92" />
                   <line x1="0" y1="50" x2="100" y2="50" />
                   <line x1="0" y1="8" x2="100" y2="8" />
+                  <polyline className="cost-line" points={chartPoints("totalCost")} />
+                  <polyline className="value-line" points={chartPoints("totalValue")} />
                   <g className="daily-candles" aria-label="Gunluk yukselis ve dusus igneleri">
                     {dailyCandles.map((candle) => (
                       <g className={`history-candle ${candle.trend}`} key={candle.date}>
@@ -1981,9 +1985,14 @@ export default function Home() {
                       </g>
                     ))}
                   </g>
-                  <polyline className="cost-line" points={chartPoints("totalCost")} />
-                  <polyline className="value-line" points={chartPoints("totalValue")} />
                 </svg>
+                <div className="history-date-axis" aria-label="Grafik tarihleri">
+                  {historySeries.map((item, index) => {
+                    const interval = Math.max(1, Math.ceil(historySeries.length / 7));
+                    const visible = index === 0 || index === historySeries.length - 1 || index % interval === 0;
+                    return visible ? <span key={item.date}>{item.date.slice(8, 10)}.{item.date.slice(5, 7)}</span> : null;
+                  })}
+                </div>
                 <div className="chart-legend">
                   <span><i className="value-swatch" /> Guncel deger</span>
                   <span><i className="cost-swatch" /> Ana para</span>

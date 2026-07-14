@@ -2645,7 +2645,7 @@ export default function Home() {
             </section>
           </section>
 
-          <section className="report-page assets-page">
+          <section className="report-page assets-page assets-detail-page">
             <div className="report-hero compact"><div><h1>Portfoy Varliklari</h1><p>Kategorilere ayrilmis detayli portfoy listesi.</p></div></div>
             <section className="report-panel">
               <table className="report-table">

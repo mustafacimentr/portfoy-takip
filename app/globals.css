@@ -2699,6 +2699,20 @@ label {
     text-align: right;
   }
 
+  .assets-detail-page .report-table {
+    font-size: 8px;
+  }
+
+  .assets-detail-page .report-table th,
+  .assets-detail-page .report-table td {
+    padding: 3px 5px;
+  }
+
+  .assets-detail-page .report-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .report-table th {
     color: var(--muted);
     background: #f8fafc;
@@ -2715,13 +2729,13 @@ label {
   .report-table td:first-child small {
     display: block;
     color: var(--muted);
-    margin-top: 2px;
+    margin-top: 1px;
   }
 
   .report-asset-cell {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
     min-width: 0;
   }
 
@@ -2731,14 +2745,14 @@ label {
   }
 
   .report-asset-cell .asset-logo {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     font-size: 7px;
   }
 
   .report-asset-cell .asset-logo.small {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
   }
 
   .report-asset-cell .asset-logo img {
@@ -2751,6 +2765,13 @@ label {
     color: #10243f;
     font-weight: 900;
     text-align: left !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .report-group-row + tr {
+    break-before: avoid;
+    page-break-before: avoid;
   }
 
   .print-report .projection-list {

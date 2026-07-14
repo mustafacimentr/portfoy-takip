@@ -2626,6 +2626,42 @@ export default function Home() {
               </div>
             </section>
 
+            <section className="report-summary-grid">
+              <section className="report-panel report-category-summary">
+                <div className="report-panel-head"><h2>Kategori Kar / Zarar Ozeti</h2><p>Sinif bazinda yatirilan tutar, guncel deger ve net sonuc.</p></div>
+                <div className="category-summary-list">
+                  {groupedAssets.map((group) => (
+                    <div className="category-summary-row" key={group.key}>
+                      <span style={{ background: groupColors[group.key] || "#647181" }} />
+                      <strong>{group.label}</strong>
+                      <small>Yatirilan {money(group.cost)}</small>
+                      <b>{money(group.value)}</b>
+                      <em className={group.profitLoss >= 0 ? "positive" : "negative"}>{signedMoney(group.profitLoss)}</em>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="report-panel report-executive-side">
+                <div className="report-panel-head"><h2>Yonetici Ozeti</h2><p>En buyuk agirliklar ve takip edilmesi gereken risk sinyalleri.</p></div>
+                <div className="report-top-list">
+                  {portfolioRows.slice(0, 5).map((row) => (
+                    <div className="report-top-row" key={row.asset.id}>
+                      <AssetLogo asset={row.asset} color={row.color} small />
+                      <strong>{row.asset.ticker}</strong>
+                      <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(3, row.share)}%`, background: row.color }} /></div>
+                      <span>{pct(row.share)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="report-mini-risk">
+                  <article><span>Risk</span><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}/10</strong><small>{riskLevel}</small></article>
+                  <article><span>Cesitlilik</span><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}/10</strong><small>{activeGroupCount} sinif</small></article>
+                  <article><span>Ilk 5 agirlik</span><strong>{pct(top5Share)}</strong><small>Toplam pay</small></article>
+                </div>
+              </section>
+            </section>
+
           </section>
 
           <section className="report-page portfolio-report-page">

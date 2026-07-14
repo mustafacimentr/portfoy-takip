@@ -1360,6 +1360,8 @@ select:focus {
 
 .risk-panel {
   padding: 18px;
+  background: #ffffff;
+  border-color: #d9e4ef;
 }
 
 .risk-head {
@@ -1367,6 +1369,8 @@ select:focus {
   justify-content: space-between;
   gap: 18px;
   align-items: flex-start;
+  padding: 2px 0 14px;
+  border-bottom: 1px solid var(--line);
 }
 
 .risk-head h2 {
@@ -1387,16 +1391,16 @@ select:focus {
 
 .score-pill {
   min-width: 110px;
-  border: 1px solid #e2c46a;
+  border: 1px solid #b9d7e8;
   border-radius: 8px;
   padding: 8px 12px;
   text-align: center;
-  background: #fffdf5;
+  background: #f3f9fc;
 }
 
 .score-pill strong {
   display: block;
-  color: #b17d12;
+  color: #117a8b;
   font-size: 22px;
   line-height: 1;
 }
@@ -1407,33 +1411,78 @@ select:focus {
   text-transform: uppercase;
 }
 
+.risk-summary-strip {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.risk-summary-strip article {
+  border: 1px solid #d9e4ef;
+  border-left: 4px solid #117a8b;
+  border-radius: 8px;
+  background: #f7fbfd;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.risk-summary-strip article:nth-child(2) {
+  border-left-color: #18b884;
+}
+
+.risk-summary-strip article:nth-child(3) {
+  border-left-color: #193a6a;
+}
+
+.risk-summary-strip span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.risk-summary-strip strong {
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.risk-summary-strip small {
+  color: #31445c;
+  line-height: 1.45;
+}
+
 .risk-metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  padding-top: 18px;
+  padding-top: 14px;
 }
 
 .risk-metric {
-  border: 1px solid var(--line);
-  border-top: 3px solid #cbd5df;
+  border: 1px solid #d9e4ef;
+  border-top: 3px solid #117a8b;
   border-radius: 8px;
-  background: #fbfcfd;
+  background: #ffffff;
   padding: 12px;
   display: grid;
   gap: 4px;
 }
 
 .risk-metric.green {
-  border-top-color: var(--green);
+  border-top-color: #18b884;
+  background: #f1fbf7;
 }
 
 .risk-metric.gold {
   border-top-color: #d19a18;
+  background: #fffaf0;
 }
 
 .risk-metric.red {
   border-top-color: var(--red);
+  background: #fff6f4;
 }
 
 .risk-metric span {
@@ -1454,18 +1503,21 @@ select:focus {
 
 .risk-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 28px;
-  padding: 18px 0 0;
+  gap: 10px;
+  padding: 14px 0 0;
 }
 
 .risk-grid article {
-  border-left: 4px solid #d19a18;
-  padding-left: 12px;
+  border: 1px solid #d9e4ef;
+  border-radius: 8px;
+  border-left: 4px solid #117a8b;
+  padding: 12px;
+  background: #fbfcfd;
 }
 
 .risk-grid h3 {
   margin: 0 0 6px;
-  color: #9a6b0f;
+  color: #117a8b;
   font-size: 13px;
   text-transform: uppercase;
 }
@@ -1941,6 +1993,7 @@ label {
   .insights-grid,
   .analytics-layout,
   .callout-grid,
+  .risk-summary-strip,
   .risk-grid,
   .risk-metric-grid {
     grid-template-columns: 1fr;
@@ -2516,12 +2569,44 @@ label {
   }
 
   .print-report .risk-panel {
-    border-color: #f0d58e;
-    background: #fffdf5;
+    border-color: #d9e4ef;
+    background: #ffffff;
   }
 
   .print-report .risk-head {
-    padding: 12px 12px 6px;
+    padding: 12px 12px 9px;
+    border-bottom: 1px solid #d9e4ef;
+  }
+
+  .print-report .score-pill {
+    background: #f3f9fc;
+    border-color: #b9d7e8;
+  }
+
+  .print-report .score-pill strong {
+    color: #117a8b;
+  }
+
+  .print-report .risk-summary-strip {
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 6px;
+    padding: 8px 12px 4px;
+  }
+
+  .print-report .risk-summary-strip article {
+    padding: 7px;
+    background: #f7fbfd;
+    border-color: #d9e4ef;
+    border-left-width: 3px;
+  }
+
+  .print-report .risk-summary-strip span,
+  .print-report .risk-summary-strip small {
+    font-size: 8px;
+  }
+
+  .print-report .risk-summary-strip strong {
+    font-size: 11px;
   }
 
   .print-report .risk-metric-grid {
@@ -2545,10 +2630,24 @@ label {
   }
 
   .print-report .risk-grid {
-    padding: 6px 12px 12px;
+    padding: 8px 12px 12px;
+    gap: 6px;
   }
 
   .print-report .risk-grid article {
-    background: transparent;
+    background: #fbfcfd;
+    border: 1px solid #d9e4ef;
+    border-left: 3px solid #117a8b;
+    padding: 8px;
+  }
+
+  .print-report .risk-grid h3 {
+    color: #117a8b;
+    font-size: 9px;
+  }
+
+  .print-report .risk-grid p {
+    font-size: 9px;
+    line-height: 1.45;
   }
 }

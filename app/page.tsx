@@ -2346,6 +2346,11 @@ export default function Home() {
                 <div className="score-pill"><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Cesitlilik / 10</span></div>
               </div>
             </div>
+            <div className="risk-summary-strip">
+              <article><span>Oncelikli takip</span><strong>{portfolioRows[0]?.asset.ticker || "-"}</strong><small>{riskDriver}</small></article>
+              <article><span>Denge hamlesi</span><strong>{biggestGroup?.label || "-"}</strong><small>Yeni yatirimlarda hedefin altinda kalan siniflara agirlik ver.</small></article>
+              <article><span>Kontrol ritmi</span><strong>Aylik</strong><small>Ilk 5 agirlik ve hedef sapmasi ayda bir kontrol edilmeli.</small></article>
+            </div>
             <div className="risk-metric-grid">
               {riskMetrics.map((metric) => (
                 <article className={`risk-metric ${metric.tone}`} key={metric.label}>
@@ -2583,11 +2588,16 @@ export default function Home() {
                 <div>
                   <h2>Risk & Cesitlilik Notu</h2>
                   <p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p>
-                </div>
-                <div className="score-row">
-                  <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>{riskLevel} Risk / 10</span></div>
-                  <div className="score-pill"><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Cesitlilik / 10</span></div>
-                </div>
+              </div>
+              <div className="score-row">
+                <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>{riskLevel} Risk / 10</span></div>
+                <div className="score-pill"><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Cesitlilik / 10</span></div>
+              </div>
+            </div>
+              <div className="risk-summary-strip">
+                <article><span>Oncelikli takip</span><strong>{portfolioRows[0]?.asset.ticker || "-"}</strong><small>{riskDriver}</small></article>
+                <article><span>Denge hamlesi</span><strong>{biggestGroup?.label || "-"}</strong><small>Yeni yatirimlarda hedefin altinda kalan siniflara agirlik ver.</small></article>
+                <article><span>Kontrol ritmi</span><strong>Aylik</strong><small>Ilk 5 agirlik ve hedef sapmasi ayda bir kontrol edilmeli.</small></article>
               </div>
               <div className="risk-metric-grid">
                 {riskMetrics.map((metric) => (

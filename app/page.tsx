@@ -292,6 +292,10 @@ function parseAmount(value: string | number) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function amountFieldValue(value?: number) {
+  return Number.isFinite(Number(value)) && Number(value) !== 0 ? String(value) : "";
+}
+
 function money(value: number, currency = "TRY") {
   return Number(value || 0).toLocaleString("tr-TR", {
     style: "currency",
@@ -520,6 +524,7 @@ export default function Home() {
   const [hoveredHistoryIndex, setHoveredHistoryIndex] = useState<number | null>(null);
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
   const [assetLookup, setAssetLookup] = useState<{ loading: boolean; message: string; ok: boolean }>({ loading: false, message: "", ok: false });
+  const [assetDraftInputs, setAssetDraftInputs] = useState({ quantity: "", avgCost: "", target: "" });
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
@@ -1281,7 +1286,13 @@ export default function Home() {
   async function submitAsset(event: FormEvent) {
     event.preventDefault();
     if (!assetDraft) return;
-    let asset = await discoverDraftAsset(assetDraft, false);
+    const numericDraft = normalizeAsset({
+      ...assetDraft,
+      quantity: parseAmount(assetDraftInputs.quantity),
+      avgCost: parseAmount(assetDraftInputs.avgCost),
+      target: parseAmount(assetDraftInputs.target),
+    });
+    let asset = await discoverDraftAsset(numericDraft, false);
     if (asset.autoUpdate && asset.priceSource !== "manual") {
       try {
         const result = await fetchPrice(asset);
@@ -1469,7 +1480,13 @@ export default function Home() {
   function openAsset(asset?: Asset) {
     setSelectedAssetId("");
     setAssetLookup({ loading: false, message: "", ok: false });
-    setAssetDraft(asset ? { ...asset } : normalizeAsset({ ticker: "", quantity: 0, avgCost: 0, price: 0 }));
+    const nextAsset = asset ? { ...asset } : normalizeAsset({ ticker: "", quantity: 0, avgCost: 0, price: 0 });
+    setAssetDraft(nextAsset);
+    setAssetDraftInputs({
+      quantity: amountFieldValue(nextAsset.quantity),
+      avgCost: amountFieldValue(nextAsset.avgCost),
+      target: amountFieldValue(nextAsset.target),
+    });
   }
 
   function openAssetDetail(asset: Asset) {
@@ -2825,18 +2842,31 @@ export default function Home() {
               </div>
               {assetLookup.message ? <div className={`lookup-message wide ${assetLookup.ok ? "success" : ""}`}>{assetLookup.message}</div> : null}
               <label>Adet
-                <input className="input" value={assetDraft.quantity || ""} onChange={(event) => setAssetDraft({ ...assetDraft, quantity: parseAmount(event.target.value) })} required />
+                <input className="input" inputMode="decimal" value={assetDraftInputs.quantity} onChange={(event) => {
+                  const value = event.target.value;
+                  setAssetDraftInputs((draft) => ({ ...draft, quantity: value }));
+                  setAssetDraft({ ...assetDraft, quantity: parseAmount(value) });
+                }} required />
               </label>
               <label>Ortalama alis fiyati
-                <input className="input" value={assetDraft.avgCost || ""} onChange={(event) => setAssetDraft({ ...assetDraft, avgCost: parseAmount(event.target.value), price: assetDraft.price || parseAmount(event.target.value) })} required />
+                <input className="input" inputMode="decimal" value={assetDraftInputs.avgCost} onChange={(event) => {
+                  const value = event.target.value;
+                  const amount = parseAmount(value);
+                  setAssetDraftInputs((draft) => ({ ...draft, avgCost: value }));
+                  setAssetDraft({ ...assetDraft, avgCost: amount, price: assetDraft.price || amount });
+                }} required />
               </label>
               <label>Hedef pay (%)
-                <input className="input" value={assetDraft.target || ""} onChange={(event) => setAssetDraft({ ...assetDraft, target: parseAmount(event.target.value) })} />
+                <input className="input" inputMode="decimal" value={assetDraftInputs.target} onChange={(event) => {
+                  const value = event.target.value;
+                  setAssetDraftInputs((draft) => ({ ...draft, target: value }));
+                  setAssetDraft({ ...assetDraft, target: parseAmount(value) });
+                }} />
               </label>
               <label>Not
                 <input className="input" value={assetDraft.note} onChange={(event) => setAssetDraft({ ...assetDraft, note: event.target.value })} />
               </label>
-              <div className="auto-summary wide">Toplam maliyet: <strong>{money(assetDraft.quantity * assetDraft.avgCost, assetDraft.currency)}</strong></div>
+              <div className="auto-summary wide">Toplam maliyet: <strong>{money(parseAmount(assetDraftInputs.quantity) * parseAmount(assetDraftInputs.avgCost), assetDraft.currency)}</strong></div>
             </div>
             <div className="modal-footer">
               <button type="button" className="secondary" onClick={() => setAssetDraft(null)}>Vazgec</button>

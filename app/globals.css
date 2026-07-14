@@ -2462,6 +2462,34 @@ label {
     margin-top: 2px;
   }
 
+  .report-asset-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .report-asset-cell > span:last-child {
+    display: grid;
+    gap: 1px;
+  }
+
+  .report-asset-cell .asset-logo {
+    width: 18px;
+    height: 18px;
+    font-size: 7px;
+  }
+
+  .report-asset-cell .asset-logo.small {
+    width: 18px;
+    height: 18px;
+  }
+
+  .report-asset-cell .asset-logo img {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
   .report-group-row td {
     background: #edf4f8;
     color: #10243f;

@@ -1680,7 +1680,15 @@ export default function Home() {
 
   function printPortfolioReport() {
     const previousTitle = document.title;
-    document.title = " ";
+    const now = new Date();
+    const parts = [
+      now.getDate(),
+      now.getMonth() + 1,
+      now.getFullYear(),
+      now.getHours(),
+      now.getMinutes(),
+    ].map((item) => String(item).padStart(2, "0"));
+    document.title = `mustafa-cimen-portfoy-${parts.join("-")}`;
     window.setTimeout(() => {
       window.print();
       window.setTimeout(() => {
@@ -2507,7 +2515,12 @@ export default function Home() {
                       <Fragment key={asset.id}>
                         {showGroup && group ? <tr className="report-group-row"><td colSpan={7}>{group.label} · {group.assets.length} varlik · Yatirilan {money(group.cost)} · <span className={group.profitLoss >= 0 ? "positive" : "negative"}>{signedMoney(group.profitLoss)}</span></td></tr> : null}
                         <tr>
-                          <td><strong>{asset.ticker}</strong><small>{asset.name}</small></td>
+                          <td>
+                            <span className="report-asset-cell">
+                              <AssetLogo asset={asset} color={groupColors[currentGroupKey] || "#647181"} small />
+                              <span><strong>{asset.ticker}</strong><small>{asset.name}</small></span>
+                            </span>
+                          </td>
                           <td>{num(asset.quantity)}</td>
                           <td>{money(cost)}</td>
                           <td>{money(asset.price, asset.currency)}</td>

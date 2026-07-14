@@ -1048,8 +1048,42 @@ export default function Home() {
   const activeMenu = menuItems.find((item) => item.key === activeTab) || menuItems[0];
   const topShare = portfolioRows[0]?.share || 0;
   const activeGroupCount = groupedAssets.length;
-  const riskScore = Math.max(1, Math.min(10, 10 - topShare / 18 + activeGroupCount * 0.25));
-  const diversityScore = Math.max(1, Math.min(10, activeGroupCount * 1.55 + Math.min(2.4, portfolioRows.length / 8) - topShare / 35));
+  const top3Share = portfolioRows.slice(0, 3).reduce((sum, row) => sum + row.share, 0);
+  const top5Share = portfolioRows.slice(0, 5).reduce((sum, row) => sum + row.share, 0);
+  const biggestGroup = groupedAssets
+    .map((group) => ({ ...group, share: totals.totalValue ? (group.value / totals.totalValue) * 100 : 0 }))
+    .sort((left, right) => right.share - left.share)[0];
+  const cryptoShare = groupedAssets.find((group) => group.key === "Kripto")?.value || 0;
+  const cashShare = totals.totalValue ? (totals.cash / totals.totalValue) * 100 : 0;
+  const cryptoSharePct = totals.totalValue ? (cryptoShare / totals.totalValue) * 100 : 0;
+  const maxTargetDeviation = targetRows.reduce((max, row) => Math.max(max, Math.abs(row.gapShare)), 0);
+  const hhiScore = portfolioRows.reduce((sum, row) => sum + row.share * row.share, 0);
+  const concentrationRisk = Math.min(100, topShare * 1.25 + Math.max(0, top3Share - 45) * 0.7 + Math.max(0, (biggestGroup?.share || 0) - 45) * 0.6);
+  const cryptoRisk = Math.min(20, cryptoSharePct * 0.8);
+  const targetRisk = Math.min(20, maxTargetDeviation * 0.9);
+  const cashRisk = cashShare < 3 ? 7 : cashShare > 20 ? 5 : 0;
+  const measuredRiskScore = Math.max(0, Math.min(100, concentrationRisk + cryptoRisk + targetRisk + cashRisk));
+  const diversificationScore = Math.max(0, Math.min(100, 100 - Math.min(70, hhiScore / 18) - Math.max(0, top5Share - 70) * 0.7 + Math.min(12, activeGroupCount * 2)));
+  const riskScore = Math.max(1, Math.min(10, measuredRiskScore / 10));
+  const diversityScore = Math.max(1, Math.min(10, diversificationScore / 10));
+  const riskLevel = measuredRiskScore >= 70 ? "Yuksek" : measuredRiskScore >= 45 ? "Orta" : "Dusuk";
+  const riskDriver = topShare >= 25
+    ? `En buyuk risk ${portfolioRows[0]?.asset.ticker || "-"} agirliginin ${pct(topShare)} seviyesinde olmasi.`
+    : top3Share >= 50
+      ? `Ilk 3 varlik portfoyun ${pct(top3Share)} kadarini olusturuyor.`
+      : maxTargetDeviation >= 8
+        ? `Hedef portfoyden en buyuk sapma ${pct(maxTargetDeviation)} seviyesinde.`
+        : "Portfoy yogunlasmasi su an kabul edilebilir seviyede gorunuyor.";
+  const riskMetrics = [
+    { label: "En buyuk varlik", value: portfolioRows[0]?.asset.ticker || "-", detail: pct(topShare), tone: topShare >= 25 ? "red" : topShare >= 15 ? "gold" : "green" },
+    { label: "Ilk 3 agirlik", value: pct(top3Share), detail: "Toplam pay", tone: top3Share >= 55 ? "red" : top3Share >= 40 ? "gold" : "green" },
+    { label: "Ilk 5 agirlik", value: pct(top5Share), detail: "Toplam pay", tone: top5Share >= 75 ? "red" : top5Share >= 60 ? "gold" : "green" },
+    { label: "Sinif yogunlugu", value: biggestGroup?.label || "-", detail: pct(biggestGroup?.share || 0), tone: (biggestGroup?.share || 0) >= 45 ? "red" : (biggestGroup?.share || 0) >= 35 ? "gold" : "green" },
+    { label: "Kripto agirligi", value: pct(cryptoSharePct), detail: "Riskli varlik payi", tone: cryptoSharePct >= 20 ? "red" : cryptoSharePct >= 10 ? "gold" : "green" },
+    { label: "Nakit orani", value: pct(cashShare), detail: "Tampon pay", tone: cashShare < 3 ? "red" : cashShare <= 15 ? "green" : "gold" },
+    { label: "Hedef sapmasi", value: pct(maxTargetDeviation), detail: "En buyuk fark", tone: maxTargetDeviation >= 12 ? "red" : maxTargetDeviation >= 6 ? "gold" : "green" },
+    { label: "HHI yogunlasma", value: hhiScore.toLocaleString("tr-TR", { maximumFractionDigits: 0 }), detail: "Dusuk daha iyi", tone: hhiScore >= 1800 ? "red" : hhiScore >= 900 ? "gold" : "green" },
+  ];
 
   async function login(code = draftPasscode) {
     setAuthError("");
@@ -2300,15 +2334,24 @@ export default function Home() {
                 <p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p>
               </div>
               <div className="score-row">
-                <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Genel Risk / 10</span></div>
+                <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>{riskLevel} Risk / 10</span></div>
                 <div className="score-pill"><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Cesitlilik / 10</span></div>
               </div>
             </div>
+            <div className="risk-metric-grid">
+              {riskMetrics.map((metric) => (
+                <article className={`risk-metric ${metric.tone}`} key={metric.label}>
+                  <span>{metric.label}</span>
+                  <strong>{metric.value}</strong>
+                  <small>{metric.detail}</small>
+                </article>
+              ))}
+            </div>
             <div className="risk-grid">
-              <article><h3>Dagilim yapisi</h3><p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk pay {portfolioRows[0]?.asset.ticker || "-"} tarafinda ve toplam portfoyun {pct(topShare)} seviyesinde.</p></article>
-              <article><h3>Yogunlasma dengesi</h3><p>Degerli madenler, yatirim fonlari, hisse senetleri ve kripto varliklar ayni ekranda izleniyor. Bu dagilim tek bir varlik turune bagimliligi azaltir.</p></article>
-              <article><h3>Ortusme kontrolu</h3><p>Fonlar ile dogrudan hisse pozisyonlari arasinda kismi ortusme olabilir. En yuksek agirlikli varliklar duzenli izlenirse risk daha net yonetilir.</p></article>
-              <article><h3>Stratejik degerlendirme</h3><p>Portfoy orta riskli, cesitlendirilmis bir yapiya yakindir. Yeni yatirimlarda hedef paylara gore eksik kalan siniflara agirlik vermek dengeyi guclendirir.</p></article>
+              <article><h3>Riskin ana nedeni</h3><p>{riskDriver}</p></article>
+              <article><h3>Dagilim yapisi</h3><p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk sinif {biggestGroup?.label || "-"} ve payi {pct(biggestGroup?.share || 0)} seviyesinde.</p></article>
+              <article><h3>Yogunlasma dengesi</h3><p>Ilk 3 varlik {pct(top3Share)}, ilk 5 varlik {pct(top5Share)} agirlik tasiyor. Bu oranlar arttikca tekil varlik etkisi guclenir.</p></article>
+              <article><h3>Stratejik degerlendirme</h3><p>Hedef portfoyden en buyuk sapma {pct(maxTargetDeviation)}. Yeni yatirimlarda hedef paylara gore eksik kalan siniflara agirlik vermek dengeyi guclendirir.</p></article>
             </div>
           </section>
         ) : null}
@@ -2529,15 +2572,24 @@ export default function Home() {
                   <p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p>
                 </div>
                 <div className="score-row">
-                  <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Genel Risk / 10</span></div>
+                  <div className="score-pill"><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>{riskLevel} Risk / 10</span></div>
                   <div className="score-pill"><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</strong><span>Cesitlilik / 10</span></div>
                 </div>
               </div>
+              <div className="risk-metric-grid">
+                {riskMetrics.map((metric) => (
+                  <article className={`risk-metric ${metric.tone}`} key={metric.label}>
+                    <span>{metric.label}</span>
+                    <strong>{metric.value}</strong>
+                    <small>{metric.detail}</small>
+                  </article>
+                ))}
+              </div>
               <div className="risk-grid">
-                <article><h3>Dagilim yapisi</h3><p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk pay {portfolioRows[0]?.asset.ticker || "-"} tarafinda ve toplam portfoyun {pct(topShare)} seviyesinde.</p></article>
-                <article><h3>Yogunlasma dengesi</h3><p>Degerli madenler, yatirim fonlari, hisse senetleri ve kripto varliklar ayni ekranda izleniyor. Bu dagilim tek bir varlik turune bagimliligi azaltir.</p></article>
-                <article><h3>Ortusme kontrolu</h3><p>Fonlar ile dogrudan hisse pozisyonlari arasinda kismi ortusme olabilir. En yuksek agirlikli varliklar duzenli izlenirse risk daha net yonetilir.</p></article>
-                <article><h3>Stratejik degerlendirme</h3><p>Portfoy orta riskli, cesitlendirilmis bir yapiya yakindir. Yeni yatirimlarda hedef paylara gore eksik kalan siniflara agirlik vermek dengeyi guclendirir.</p></article>
+                <article><h3>Riskin ana nedeni</h3><p>{riskDriver}</p></article>
+                <article><h3>Dagilim yapisi</h3><p>Portfoy {activeGroupCount} ana sinifa dagiliyor. En buyuk sinif {biggestGroup?.label || "-"} ve payi {pct(biggestGroup?.share || 0)} seviyesinde.</p></article>
+                <article><h3>Yogunlasma dengesi</h3><p>Ilk 3 varlik {pct(top3Share)}, ilk 5 varlik {pct(top5Share)} agirlik tasiyor. Bu oranlar arttikca tekil varlik etkisi guclenir.</p></article>
+                <article><h3>Stratejik degerlendirme</h3><p>Hedef portfoyden en buyuk sapma {pct(maxTargetDeviation)}. Yeni yatirimlarda hedef paylara gore eksik kalan siniflara agirlik vermek dengeyi guclendirir.</p></article>
               </div>
             </section>
           </section>

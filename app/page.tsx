@@ -2561,8 +2561,8 @@ export default function Home() {
               <article className="gold"><span>Yatirilan ana para</span><strong>{money(totals.totalCost)}</strong></article>
               <article className={totals.pl >= 0 ? "green" : "red"}><span>Varlik degeri</span><TrendValue trend={totals.pl}>{money(totals.totalValue)}</TrendValue></article>
               <article className={totals.pl >= 0 ? "green" : "red"}><span>Net durum</span><TrendValue trend={totals.pl}>{signedMoney(totals.pl)}</TrendValue><small>{pct(totals.rate)}</small></article>
-              <article className={(bestAsset?.returnRate || 0) >= 0 ? "green" : "red"}><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"}</strong><small>{bestAsset ? `${pct(bestAsset.returnRate)} · ${absoluteMoney(bestAsset.profitLoss)}` : "%0"}</small></article>
-              <article className={(worstAsset?.returnRate || 0) >= 0 ? "green" : "red"}><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"}</strong><small>{worstAsset ? `${pct(worstAsset.returnRate)} · ${absoluteMoney(worstAsset.profitLoss)}` : "%0"}</small></article>
+              <article className={(bestAsset?.returnRate || 0) >= 0 ? "green" : "red"}><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"}</strong><small className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(bestAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{bestAsset ? `${pct(bestAsset.returnRate)} · ${absoluteMoney(bestAsset.profitLoss)}` : "%0"}</small></article>
+              <article className={(worstAsset?.returnRate || 0) >= 0 ? "green" : "red"}><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"}</strong><small className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><span className={`trend-triangle ${(worstAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{worstAsset ? `${pct(worstAsset.returnRate)} · ${absoluteMoney(worstAsset.profitLoss)}` : "%0"}</small></article>
             </div>
 
             <section className="report-panel">
@@ -2747,8 +2747,8 @@ export default function Home() {
             <section>
               <h2>Performans ozeti</h2>
               <div className="print-summary-list">
-                <div><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{bestAsset?.asset.ticker || "-"} · {bestAsset ? signedPct(bestAsset.returnRate) : "%0"}</strong></div>
-                <div><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}>{worstAsset?.asset.ticker || "-"} · {worstAsset ? signedPct(worstAsset.returnRate) : "%0"}</strong></div>
+                <div><span>En iyi performans</span><strong className={(bestAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><i className={`trend-triangle ${(bestAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{bestAsset?.asset.ticker || "-"} · {bestAsset ? signedPct(bestAsset.returnRate) : "%0"}</strong></div>
+                <div><span>En zayif performans</span><strong className={(worstAsset?.returnRate || 0) >= 0 ? "positive" : "negative"}><i className={`trend-triangle ${(worstAsset?.returnRate || 0) >= 0 ? "up" : "down"}`} />{worstAsset?.asset.ticker || "-"} · {worstAsset ? signedPct(worstAsset.returnRate) : "%0"}</strong></div>
                 <div><span>Risk notu</span><strong>{riskScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}/10</strong></div>
                 <div><span>Cesitlilik notu</span><strong>{diversityScore.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}/10</strong></div>
               </div>

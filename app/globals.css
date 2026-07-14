@@ -2506,9 +2506,31 @@ label {
 
   .report-cards small,
   .report-insights small {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 5px;
     margin-top: 4px;
     color: var(--muted);
+  }
+
+  .report-insights small.positive {
+    color: var(--green);
+  }
+
+  .report-insights small.negative {
+    color: var(--red);
+  }
+
+  .report-insights small .trend-triangle,
+  .print-summary-list strong .trend-triangle {
+    transform: scale(0.72);
+    transform-origin: center;
+  }
+
+  .print-summary-list strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
   }
 
   .report-panel {

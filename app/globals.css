@@ -2742,6 +2742,95 @@ label {
     font-size: 8px;
   }
 
+  .report-performance-radar {
+    margin-top: 8px;
+  }
+
+  .report-radar-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+    padding: 10px 12px 12px;
+  }
+
+  .report-radar-card {
+    border: 1px solid #dbe3ec;
+    border-radius: 8px;
+    background: #f4f6f8;
+    overflow: hidden;
+  }
+
+  .report-radar-card.positive {
+    border-top: 3px solid var(--green);
+  }
+
+  .report-radar-card.negative {
+    border-top: 3px solid var(--red);
+  }
+
+  .report-radar-card h3 {
+    margin: 0;
+    padding: 7px 8px 5px;
+    color: var(--ink);
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1.25;
+  }
+
+  .report-radar-list {
+    display: grid;
+    gap: 1px;
+    padding: 0 7px 7px;
+  }
+
+  .report-radar-row {
+    display: grid;
+    grid-template-columns: 14px 18px minmax(36px, 1fr);
+    grid-template-areas:
+      "rank logo ticker"
+      "rank logo amount";
+    gap: 0 5px;
+    align-items: center;
+    padding: 5px 0;
+    border-top: 1px solid #e1e8f0;
+    font-size: 8px;
+  }
+
+  .report-radar-row > span {
+    grid-area: rank;
+    color: var(--muted);
+    font-weight: 900;
+  }
+
+  .report-radar-row .asset-logo {
+    grid-area: logo;
+    width: 16px;
+    height: 16px;
+  }
+
+  .report-radar-row strong {
+    grid-area: ticker;
+    font-size: 9px;
+  }
+
+  .report-radar-row b {
+    grid-area: amount;
+    font-size: 8px;
+  }
+
+  .report-radar-row em {
+    display: none;
+  }
+
+  .report-radar-empty {
+    min-height: 44px;
+    padding: 8px 0;
+    border-top: 1px solid #e1e8f0;
+    color: var(--muted);
+    font-size: 8px;
+    line-height: 1.35;
+  }
+
   .print-report .portfolio-bars {
     padding: 9px 12px;
     gap: 3px;

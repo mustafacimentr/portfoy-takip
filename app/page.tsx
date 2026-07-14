@@ -21,6 +21,8 @@ type Asset = {
   note: string;
   lastPriceAt?: string;
   lastPriceError?: string;
+  previousPrice?: number;
+  previousPriceAt?: string;
   logoUrl?: string;
 };
 
@@ -476,6 +478,8 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
     note: asset.note || "",
     lastPriceAt: asset.lastPriceAt,
     lastPriceError: asset.lastPriceError,
+    previousPrice: Number.isFinite(Number(asset.previousPrice)) ? Number(asset.previousPrice) : undefined,
+    previousPriceAt: asset.previousPriceAt,
     logoUrl: asset.logoUrl,
   };
 }
@@ -813,6 +817,9 @@ export default function Home() {
       .map((asset) => {
         const value = asset.quantity * asset.price * (asset.fxRate || 1);
         const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
+        const previousPrice = Number(asset.previousPrice || 0);
+        const previousValue = previousPrice > 0 ? asset.quantity * previousPrice * (asset.fxRate || 1) : 0;
+        const dailyChange = previousValue ? value - previousValue : 0;
         const code = compactCode(asset.ticker).slice(0, 2) || "PF";
         const groupKey = assetGroupKey(asset);
         return {
@@ -821,6 +828,9 @@ export default function Home() {
           cost,
           profitLoss: value - cost,
           returnRate: cost ? ((value - cost) / cost) * 100 : 0,
+          dailyChange,
+          dailyRate: previousValue ? (dailyChange / previousValue) * 100 : 0,
+          hasDailyChange: previousValue > 0,
           share: totals.totalValue ? (value / totals.totalValue) * 100 : 0,
           initials: code,
           color: groupColors[groupKey] || colors[assetGroupIndex(asset) % colors.length],
@@ -835,6 +845,22 @@ export default function Home() {
 
   const worstAsset = useMemo(() => {
     return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => left.returnRate - right.returnRate)[0];
+  }, [portfolioRows]);
+
+  const allTimeGainers = useMemo(() => {
+    return portfolioRows.filter((row) => row.profitLoss > 0).sort((left, right) => right.profitLoss - left.profitLoss).slice(0, 3);
+  }, [portfolioRows]);
+
+  const allTimeLosers = useMemo(() => {
+    return portfolioRows.filter((row) => row.profitLoss < 0).sort((left, right) => left.profitLoss - right.profitLoss).slice(0, 3);
+  }, [portfolioRows]);
+
+  const dailyGainers = useMemo(() => {
+    return portfolioRows.filter((row) => row.hasDailyChange && row.dailyChange > 0).sort((left, right) => right.dailyChange - left.dailyChange).slice(0, 3);
+  }, [portfolioRows]);
+
+  const dailyLosers = useMemo(() => {
+    return portfolioRows.filter((row) => row.hasDailyChange && row.dailyChange < 0).sort((left, right) => left.dailyChange - right.dailyChange).slice(0, 3);
   }, [portfolioRows]);
 
   const selectedAssetDetail = useMemo(() => {
@@ -1130,6 +1156,12 @@ export default function Home() {
     { label: "Hedef sapmasi", value: pct(maxTargetDeviation), detail: "En buyuk fark", tone: maxTargetDeviation >= 12 ? "red" : maxTargetDeviation >= 6 ? "gold" : "green" },
     { label: "HHI yogunlasma", value: hhiScore.toLocaleString("tr-TR", { maximumFractionDigits: 0 }), detail: "Dusuk daha iyi", tone: hhiScore >= 1800 ? "red" : hhiScore >= 900 ? "gold" : "green" },
   ];
+  const reportPerformanceGroups = [
+    { title: "Tum zamanlar en cok kazandiran", rows: allTimeGainers, metric: "profitLoss", tone: "positive" },
+    { title: "Tum zamanlar en cok kaybettiren", rows: allTimeLosers, metric: "profitLoss", tone: "negative" },
+    { title: "Gunun en cok kazandiran", rows: dailyGainers, metric: "dailyChange", tone: "positive" },
+    { title: "Gunun en cok kaybettiren", rows: dailyLosers, metric: "dailyChange", tone: "negative" },
+  ] as const;
 
   async function login(code = draftPasscode) {
     setAuthError("");
@@ -1226,7 +1258,8 @@ export default function Home() {
           if (!asset.autoUpdate || asset.priceSource === "manual") return asset;
           try {
             const result = await fetchPrice(asset);
-            return { ...asset, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
+            const nextPrice = Number(result.price);
+            return { ...asset, previousPrice: asset.price, previousPriceAt: asset.lastPriceAt, price: nextPrice, lastPriceAt: new Date().toISOString(), lastPriceError: "" };
           } catch (error) {
             return { ...asset, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
           }
@@ -1248,7 +1281,7 @@ export default function Home() {
       let nextAsset = target;
       try {
         const result = await fetchPrice(target);
-        nextAsset = { ...target, autoUpdate: true, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
+        nextAsset = { ...target, autoUpdate: true, previousPrice: target.price, previousPriceAt: target.lastPriceAt, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
       } catch (error) {
         nextAsset = { ...target, autoUpdate: true, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
       }
@@ -2660,6 +2693,34 @@ export default function Home() {
                   <article><span>Ilk 5 agirlik</span><strong>{pct(top5Share)}</strong><small>Toplam pay</small></article>
                 </div>
               </section>
+            </section>
+
+            <section className="report-panel report-performance-radar">
+              <div className="report-panel-head"><h2>Performans Radari</h2><p>Tum zamanlar ve gunluk bazda one cikan varliklar.</p></div>
+              <div className="report-radar-grid">
+                {reportPerformanceGroups.map((group) => (
+                  <article className={`report-radar-card ${group.tone}`} key={group.title}>
+                    <h3>{group.title}</h3>
+                    <div className="report-radar-list">
+                      {group.rows.length ? group.rows.map((row, index) => {
+                        const amount = group.metric === "dailyChange" ? row.dailyChange : row.profitLoss;
+                        const rate = group.metric === "dailyChange" ? row.dailyRate : row.returnRate;
+                        return (
+                          <div className="report-radar-row" key={row.asset.id}>
+                            <span>{index + 1}</span>
+                            <AssetLogo asset={row.asset} color={row.color} small />
+                            <strong>{row.asset.ticker}</strong>
+                            <b className={amount >= 0 ? "positive" : "negative"}>{absoluteMoney(amount)}</b>
+                            <em className={amount >= 0 ? "positive" : "negative"}>{signedPct(rate)}</em>
+                          </div>
+                        );
+                      }) : (
+                        <div className="report-radar-empty">Gunluk veri fiyat guncellemeleriyle birikir.</div>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
             </section>
 
           </section>

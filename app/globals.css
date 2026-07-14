@@ -2484,6 +2484,13 @@ label {
     color: var(--muted);
   }
 
+  .report-hero .report-title-sub {
+    margin: 2px 0 4px;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
   .report-hero > strong {
     font-size: 28px;
   }
@@ -2656,6 +2663,11 @@ label {
     page-break-before: auto;
     break-inside: auto;
     overflow: visible;
+  }
+
+  .print-report .portfolio-report-page {
+    break-before: page;
+    page-break-before: always;
   }
 
   .print-report .report-portfolio-panel .portfolio-bar-row {

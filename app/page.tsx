@@ -2584,11 +2584,11 @@ export default function Home() {
         </section>
 
         <section className="print-report" aria-label="PDF portfoy raporu">
-          <section className="report-page assets-page">
+          <section className="report-page summary-page">
             <div className="report-hero">
               <div>
-                <span>Portfoy Takip</span>
-                <h1>Portfoy Dagilimi</h1>
+                <h1>MUSTAFA CIMEN - PORTFOY RAPORU</h1>
+                <p className="report-title-sub">Portfoy Dagilimi</p>
                 <p>Rapor tarihi: {new Date().toLocaleDateString("tr-TR")} · Son kayit: {lastSync ? formatTime(lastSync) : "-"}</p>
               </div>
               <strong>{money(totals.totalValue)}</strong>
@@ -2626,8 +2626,11 @@ export default function Home() {
               </div>
             </section>
 
+          </section>
+
+          <section className="report-page portfolio-report-page">
+            <div className="report-hero compact"><div><h1>Genel Portfoy Dagilimi</h1><p>Varlik bazinda portfoy payi ve guncel deger.</p></div></div>
             <section className="report-panel report-portfolio-panel">
-              <div className="report-panel-head"><h2>Genel Portfoy Dagilimi</h2><p>Varlik bazinda portfoy payi ve guncel deger.</p></div>
               <div className="portfolio-bars report-bars">
                 {portfolioRows.map((row) => (
                   <div className="portfolio-bar-row" key={row.asset.id}>
@@ -2643,7 +2646,7 @@ export default function Home() {
           </section>
 
           <section className="report-page assets-page">
-            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Portfoy Varliklari</h1><p>Kategorilere ayrilmis detayli portfoy listesi.</p></div></div>
+            <div className="report-hero compact"><div><h1>Portfoy Varliklari</h1><p>Kategorilere ayrilmis detayli portfoy listesi.</p></div></div>
             <section className="report-panel">
               <table className="report-table">
                 <thead><tr><th>Varlik</th><th>Adet</th><th>Toplam Maliyet</th><th>Guncel</th><th>Deger</th><th>K/Z</th><th>K/Z %</th></tr></thead>
@@ -2683,7 +2686,7 @@ export default function Home() {
           </section>
 
           <section className="report-page">
-            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Gelecek Projeksiyonu</h1><p>Bugunku deger uzerine her yil 360.000 TL ek yatirim ve yillik %16 bilesik getiri varsayimi.</p></div></div>
+            <div className="report-hero compact"><div><h1>Gelecek Projeksiyonu</h1><p>Bugunku deger uzerine her yil 360.000 TL ek yatirim ve yillik %16 bilesik getiri varsayimi.</p></div></div>
             <section className="report-panel">
               <div className="projection-list">
                 {projections.map((item) => (
@@ -2698,7 +2701,7 @@ export default function Home() {
           </section>
 
           <section className="report-page">
-            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Portfoy Analitigi</h1><p>Sinif dengesi, kategori paylari ve performans ozeti.</p></div></div>
+            <div className="report-hero compact"><div><h1>Portfoy Analitigi</h1><p>Sinif dengesi, kategori paylari ve performans ozeti.</p></div></div>
             <section className="report-panel">
               <div className="analytics-layout">
                 <div className="donut-wrap">
@@ -2723,7 +2726,7 @@ export default function Home() {
           </section>
 
           <section className="report-page risk-report-page">
-            <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Risk & Cesitlilik Notu</h1><p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p></div></div>
+            <div className="report-hero compact"><div><h1>Risk & Cesitlilik Notu</h1><p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p></div></div>
             <section className="report-panel risk-panel">
               <div className="risk-head">
                 <div>
@@ -2761,7 +2764,6 @@ export default function Home() {
           <section className="legacy-print-report">
           <div className="print-report-head">
             <div>
-              <span>Portfoy Takip</span>
               <h1>Kisisel Portfoy Raporu</h1>
               <p>Rapor tarihi: {new Date().toLocaleDateString("tr-TR")} · Son kayit: {lastSync ? formatTime(lastSync) : "-"}</p>
             </div>

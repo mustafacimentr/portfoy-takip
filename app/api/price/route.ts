@@ -62,6 +62,10 @@ function parseTurkishNumber(value: string) {
   return Number(String(value || "").replace(/\./g, "").replace(",", "."));
 }
 
+function parseFundDecimal(value: string) {
+  return Number(String(value || "").replace(",", "."));
+}
+
 async function isPortfoyPrice(symbol: string) {
   const code = compactBistCode(symbol);
   const slug = isPortfoyFunds[code] || String(symbol || "").replace(/^isportfoy:/i, "");
@@ -93,8 +97,8 @@ async function akPortfoyPrice(symbol: string) {
   if (!response.ok) throw new Error(`Ak Portfoy ${response.status}`);
   const html = await response.text();
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-  const match = text.match(/Pay Degeri\s*([0-9]+(?:[.,][0-9]+)?)/i) || text.match(/Fiyat\s*([0-9]+(?:[.,][0-9]+)?)/i);
-  const price = match ? parseTurkishNumber(match[1]) : Number.NaN;
+  const match = text.match(/Pay De(?:g|ğ)eri\s*([0-9]+(?:[.,][0-9]+)?)/i) || text.match(/Fiyat\s*([0-9]+(?:[.,][0-9]+)?)/i);
+  const price = match ? parseFundDecimal(match[1]) : Number.NaN;
   if (!Number.isFinite(price) || price <= 0) throw new Error(`${code || slug} icin Ak Portfoy fiyati bulunamadi`);
   return { price, source: "Ak Portfoy", symbol: code || slug };
 }

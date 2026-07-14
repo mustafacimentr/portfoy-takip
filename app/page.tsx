@@ -123,6 +123,7 @@ const knownNames: Record<string, { name: string; type?: string; source?: string;
   TMG: { name: "Is Portfoy Yabanci Hisse Senedi Fonu", type: "Fon", source: "isportfoy", symbol: "TMG" },
   TGE: { name: "Is Portfoy Emtia Yabanci BYF Fon Sepeti Fonu", type: "Fon", source: "isportfoy", symbol: "TGE" },
   KPH: { name: "Is Portfoy Kar Payi Odeyen Hisse Senedi TL Fonu", type: "Fon", source: "isportfoy", symbol: "KPH" },
+  AFT: { name: "Ak Portfoy Yeni Teknolojiler Yabanci Hisse Senedi Fonu", type: "Fon", source: "akportfoy", symbol: "AFT" },
 };
 
 const types = ["Hisse", "Fon", "Kripto", "Doviz", "Altin", "Nakit", "Diger"];
@@ -452,10 +453,11 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
   const normalizedSymbol = isCash ? "NAKIT" : asset.priceSymbol || details.priceSymbol;
   const avgCost = Number(asset.avgCost || (isCash ? 1 : 0));
   const price = Number(asset.price || asset.avgCost || (isCash ? 1 : 0));
+  const assetName = /request rejected/i.test(String(asset.name || "")) ? details.name : asset.name || details.name;
   return {
     id: asset.id || uid(),
     ticker: asset.ticker || details.ticker,
-    name: asset.name || details.name,
+    name: assetName,
     type: normalizedType,
     currency: asset.currency || details.currency,
     priceSource: normalizedSource,
@@ -477,7 +479,7 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
 function assetGroupKey(asset: Asset) {
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   if (preciousCodes.has(code)) return "precious";
-  if (fundCodes.has(code) || asset.priceSource === "isportfoy" || asset.priceSource === "tefas") return "fund";
+  if (fundCodes.has(code) || asset.priceSource === "isportfoy" || asset.priceSource === "tefas" || asset.priceSource === "akportfoy") return "fund";
   if (asset.type === "Altin") return "precious";
   if (asset.type === "Fon") return "fund";
   return asset.type || "Diger";

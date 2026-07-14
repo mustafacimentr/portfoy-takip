@@ -19,6 +19,7 @@ async function discoverFund(code: string) {
   const known = knownFunds[code];
   let name = known?.name || code;
   try {
+    if (known) throw new Error("Bilinen fon");
     const response = await fetch(`https://www.tefas.gov.tr/tr/fon-detayli-analiz/${code}`, {
       headers: { "user-agent": "Mozilla/5.0", "accept-language": "tr-TR,tr;q=0.9" },
     });
@@ -26,7 +27,7 @@ async function discoverFund(code: string) {
     const html = await response.text();
     const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]
       || html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i)?.[1];
-    if (title && !/javascript|support id/i.test(title)) name = title.replace(/\s*[-|].*$/, "").trim();
+    if (title && !/javascript|support id|request rejected/i.test(title)) name = title.replace(/\s*[-|].*$/, "").trim();
   } catch {
     if (!known) name = `${code} Yatirim Fonu`;
   }

@@ -21,6 +21,7 @@ type Asset = {
   note: string;
   lastPriceAt?: string;
   lastPriceError?: string;
+  logoUrl?: string;
 };
 
 type Transaction = {
@@ -227,6 +228,7 @@ function cryptoBaseCode(symbol: string) {
 }
 
 function assetLogoUrl(asset: Asset) {
+  if (asset.logoUrl) return asset.logoUrl;
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   if (asset.type === "Nakit" || code === "NAKIT") return "";
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
@@ -234,7 +236,8 @@ function assetLogoUrl(asset: Asset) {
   if (directAssetLogoUrls[code]) return directAssetLogoUrls[code];
   const domain = assetLogoDomains[code] || assetLogoDomains[compactCode(asset.priceSymbol || "")];
   if (domain) return faviconUrl(domain);
-  if (asset.priceSource === "isportfoy" || asset.priceSource === "tefas") return faviconUrl("isportfoy.com.tr");
+  if (asset.priceSource === "isportfoy") return faviconUrl("isportfoy.com.tr");
+  if (asset.priceSource === "tefas") return faviconUrl("tefas.gov.tr");
   return "";
 }
 
@@ -467,6 +470,7 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
     note: asset.note || "",
     lastPriceAt: asset.lastPriceAt,
     lastPriceError: asset.lastPriceError,
+    logoUrl: asset.logoUrl,
   };
 }
 
@@ -513,6 +517,7 @@ export default function Home() {
   const [historyRange, setHistoryRange] = useState<(typeof rangeOptions)[number]["key"]>("1m");
   const [hoveredHistoryIndex, setHoveredHistoryIndex] = useState<number | null>(null);
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
+  const [assetLookup, setAssetLookup] = useState<{ loading: boolean; message: string; ok: boolean }>({ loading: false, message: "", ok: false });
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
@@ -1274,7 +1279,7 @@ export default function Home() {
   async function submitAsset(event: FormEvent) {
     event.preventDefault();
     if (!assetDraft) return;
-    let asset = normalizeAsset(assetDraft);
+    let asset = await discoverDraftAsset(assetDraft, false);
     if (asset.autoUpdate && asset.priceSource !== "manual") {
       try {
         const result = await fetchPrice(asset);
@@ -1461,7 +1466,8 @@ export default function Home() {
 
   function openAsset(asset?: Asset) {
     setSelectedAssetId("");
-    setAssetDraft(asset ? { ...asset } : normalizeAsset({ ticker: "BTC/TRY", quantity: 0, avgCost: 0, price: 0 }));
+    setAssetLookup({ loading: false, message: "", ok: false });
+    setAssetDraft(asset ? { ...asset } : normalizeAsset({ ticker: "", quantity: 0, avgCost: 0, price: 0 }));
   }
 
   function openAssetDetail(asset: Asset) {
@@ -1471,7 +1477,26 @@ export default function Home() {
 
   function updateDraftTicker(value: string) {
     const details = inferAssetDetails(value);
+    setAssetLookup({ loading: false, message: "", ok: false });
     setAssetDraft((draft) => normalizeAsset({ ...(draft || {}), ...details, ticker: details.ticker }));
+  }
+
+  async function discoverDraftAsset(draft = assetDraft, updateState = true) {
+    if (!draft || !draft.ticker.trim() || draft.priceSource === "manual") return normalizeAsset(draft || {});
+    if (updateState) setAssetLookup({ loading: true, message: "Varlik bilgileri bulunuyor...", ok: false });
+    try {
+      const discovered = await api<Partial<Asset>>(`/api/asset?code=${encodeURIComponent(draft.ticker)}`, passcode);
+      const resolved = normalizeAsset({ ...draft, ...discovered, id: draft.id, quantity: draft.quantity, avgCost: draft.avgCost, target: draft.target, note: draft.note });
+      if (updateState) {
+        setAssetDraft(resolved);
+        setAssetLookup({ loading: false, message: `${resolved.name} otomatik olarak eslestirildi.`, ok: true });
+      }
+      return resolved;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Varlik otomatik bulunamadi";
+      if (updateState) setAssetLookup({ loading: false, message: `${message}. Mevcut kodla devam edilecek.`, ok: false });
+      return normalizeAsset(draft);
+    }
   }
 
   async function deleteAsset(id: string) {
@@ -2598,7 +2623,7 @@ export default function Home() {
             </section>
           </section>
 
-          <section className="report-page">
+          <section className="report-page assets-page">
             <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Portfoy Varliklari</h1><p>Kategorilere ayrilmis detayli portfoy listesi.</p></div></div>
             <section className="report-panel">
               <table className="report-table">
@@ -2678,7 +2703,7 @@ export default function Home() {
             </section>
           </section>
 
-          <section className="report-page">
+          <section className="report-page risk-report-page">
             <div className="report-hero compact"><div><span>Portfoy Takip</span><h1>Risk & Cesitlilik Notu</h1><p>Portfoy dengesini, yogunlasmayi ve uzun vadeli buyume uyumunu ozetler.</p></div></div>
             <section className="report-panel risk-panel">
               <div className="risk-head">
@@ -2791,9 +2816,12 @@ export default function Home() {
             <div className="panel-header"><h2>{state.assets.some((item) => item.id === assetDraft.id) ? "Varligi duzenle" : "Varlik ekle"}</h2></div>
             <div className="form-grid">
               <label className="wide">Kod
-                <input className="input" value={assetDraft.ticker} onChange={(event) => updateDraftTicker(event.target.value)} placeholder="BTC/TRY, THYAO, TMG" />
+                <input className="input" value={assetDraft.ticker} onChange={(event) => updateDraftTicker(event.target.value)} onBlur={() => void discoverDraftAsset()} placeholder="AFT, THYAO veya SOL/TRY" required />
               </label>
-              <div className="auto-summary">{assetDraft.name} · {assetDraft.type} · {assetDraft.currency} · {assetDraft.priceSource} · {assetDraft.priceSymbol}</div>
+              <div className={`auto-summary asset-match ${assetLookup.loading ? "loading" : assetLookup.ok ? "matched" : ""}`}>
+                {assetDraft.ticker ? <><AssetLogo asset={assetDraft} color={groupColors[assetGroupKey(assetDraft)] || "#647181"} small /><span><strong>{assetDraft.name}</strong><small>{assetDraft.type} · {assetDraft.currency} · Fiyat ve simge otomatik</small></span></> : <span><strong>Varlik kodunu yaz</strong><small>Fon, BIST hissesi veya kripto otomatik taninir.</small></span>}
+              </div>
+              {assetLookup.message ? <div className={`lookup-message wide ${assetLookup.ok ? "success" : ""}`}>{assetLookup.message}</div> : null}
               <label>Adet
                 <input className="input" value={assetDraft.quantity || ""} onChange={(event) => setAssetDraft({ ...assetDraft, quantity: parseAmount(event.target.value) })} required />
               </label>

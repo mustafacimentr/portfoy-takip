@@ -79,6 +79,66 @@ async function isPortfoyPrice(symbol: string) {
   return { price, source: "Is Portfoy", symbol: code || slug, date: match[1] };
 }
 
+const akPortfoyFunds: Record<string, string> = {
+  AFT: "AFT-ak-portfoy-yeni-teknolojiler-yabanci-hisse-senedi-fonu",
+};
+
+async function akPortfoyPrice(symbol: string) {
+  const code = compactBistCode(symbol);
+  const slug = akPortfoyFunds[code] || String(symbol || "").replace(/^akportfoy:/i, "");
+  if (!slug) throw new Error("Ak Portfoy fon kodu gerekli");
+  const response = await fetch(`https://www.akportfoy.com.tr/tr/fon/${slug}`, {
+    headers: { "user-agent": "Mozilla/5.0", "accept-language": "tr-TR,tr;q=0.9,en;q=0.8" },
+  });
+  if (!response.ok) throw new Error(`Ak Portfoy ${response.status}`);
+  const html = await response.text();
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  const match = text.match(/Pay Degeri\s*([0-9]+(?:[.,][0-9]+)?)/i) || text.match(/Fiyat\s*([0-9]+(?:[.,][0-9]+)?)/i);
+  const price = match ? parseTurkishNumber(match[1]) : Number.NaN;
+  if (!Number.isFinite(price) || price <= 0) throw new Error(`${code || slug} icin Ak Portfoy fiyati bulunamadi`);
+  return { price, source: "Ak Portfoy", symbol: code || slug };
+}
+
+function tefasDate(date: Date) {
+  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+async function tefasPrice(symbol: string) {
+  const code = compactBistCode(symbol);
+  if (!/^[A-Z0-9]{3}$/.test(code)) throw new Error("Gecerli bir TEFAS fon kodu gerekli");
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - 14);
+  const body = new URLSearchParams({
+    fontip: "YAT",
+    sfontur: "",
+    fonkod: code,
+    bastarih: tefasDate(start),
+    bittarih: tefasDate(end),
+    fonturkod: "",
+    fonunvantip: "",
+  });
+  const response = await fetch("https://www.tefas.gov.tr/api/DB/BindHistoryInfo", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "x-requested-with": "XMLHttpRequest",
+      "referer": `https://www.tefas.gov.tr/tr/fon-detayli-analiz/${code}`,
+      "user-agent": "Mozilla/5.0",
+      "accept-language": "tr-TR,tr;q=0.9,en;q=0.8",
+    },
+    body,
+  });
+  if (!response.ok) throw new Error(`TEFAS ${response.status}`);
+  const payload = await response.json() as { data?: Array<{ FIYAT?: number; TARIH?: number | string }> };
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  const latest = rows
+    .filter((row) => Number.isFinite(Number(row?.FIYAT)) && Number(row.FIYAT) > 0)
+    .sort((a, b) => Number(b.TARIH || 0) - Number(a.TARIH || 0))[0];
+  if (!latest) throw new Error(`${code} icin TEFAS fiyati bulunamadi`);
+  return { price: Number(latest.FIYAT), source: "TEFAS", symbol: code, date: latest.TARIH };
+}
+
 async function binancePrice(symbol: string) {
   const finalSymbol = symbol.toUpperCase();
   const endpoints = [
@@ -216,7 +276,11 @@ export async function GET(request: Request) {
           ? await tradingViewPrice(symbol)
           : source === "isportfoy"
             ? await isPortfoyPrice(symbol)
-            : await yahooPrice(symbol).catch(() => tradingViewPrice(symbol)).catch(() => isPortfoyPrice(symbol));
+            : source === "akportfoy"
+              ? await akPortfoyPrice(symbol)
+              : source === "tefas"
+                ? await tefasPrice(symbol).catch(() => akPortfoyPrice(symbol))
+                : await yahooPrice(symbol).catch(() => tradingViewPrice(symbol)).catch(() => tefasPrice(symbol)).catch(() => akPortfoyPrice(symbol)).catch(() => isPortfoyPrice(symbol));
     return Response.json({ ok: true, ...result });
   } catch (error) {
     return Response.json({ ok: false, error: error instanceof Error ? error.message : "Fiyat alinamadi" }, { status: 500 });

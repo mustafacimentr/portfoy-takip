@@ -1661,6 +1661,41 @@ select:focus {
   line-height: 1.55;
 }
 
+.asset-match {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+}
+
+.asset-match > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.asset-match small {
+  color: var(--muted);
+}
+
+.asset-match.matched {
+  border-color: #9edec8;
+  background: #effaf6;
+}
+
+.asset-match.loading {
+  opacity: 0.72;
+}
+
+.lookup-message {
+  margin-top: -4px;
+  color: var(--red);
+  font-size: 12px;
+}
+
+.lookup-message.success {
+  color: var(--green);
+}
+
 .table-scroll {
   overflow-x: auto;
 }
@@ -2725,18 +2760,36 @@ label {
   }
 
   .print-report .risk-panel {
-    border-color: #d9e4ef;
-    background: #ffffff;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
   }
 
   .print-report .risk-head {
-    padding: 12px 12px 9px;
-    border-bottom: 1px solid #d9e4ef;
+    align-items: center;
+    padding: 14px 16px;
+    border: 0;
+    border-radius: 7px;
+    background: #123b52;
+    color: #ffffff;
+  }
+
+  .print-report .risk-head h2 {
+    font-size: 17px;
+    color: #ffffff;
+  }
+
+  .print-report .risk-head p {
+    color: #c9dce6;
   }
 
   .print-report .score-pill {
-    background: #f3f9fc;
-    border-color: #b9d7e8;
+    min-width: 92px;
+    padding: 8px 10px;
+    background: #ffffff;
+    border: 0;
+    border-radius: 6px;
   }
 
   .print-report .score-pill strong {
@@ -2745,15 +2798,23 @@ label {
 
   .print-report .risk-summary-strip {
     grid-template-columns: 1.2fr 1fr 1fr;
-    gap: 6px;
-    padding: 8px 12px 4px;
+    gap: 0;
+    margin-top: 10px;
+    padding: 0;
+    border-top: 1px solid #d9e4ef;
+    border-bottom: 1px solid #d9e4ef;
   }
 
   .print-report .risk-summary-strip article {
-    padding: 7px;
-    background: #f7fbfd;
-    border-color: #d9e4ef;
-    border-left-width: 3px;
+    padding: 10px 12px;
+    background: #ffffff;
+    border: 0;
+    border-right: 1px solid #d9e4ef;
+    border-radius: 0;
+  }
+
+  .print-report .risk-summary-strip article:last-child {
+    border-right: 0;
   }
 
   .print-report .risk-summary-strip span,
@@ -2767,14 +2828,33 @@ label {
 
   .print-report .risk-metric-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-    padding: 6px 12px;
+    gap: 1px;
+    margin-top: 12px;
+    padding: 1px;
+    background: #d9e4ef;
+    border: 1px solid #d9e4ef;
+    border-radius: 7px;
+    overflow: hidden;
   }
 
   .print-report .risk-metric {
-    padding: 7px;
-    gap: 2px;
+    min-height: 56px;
+    padding: 9px 10px;
+    gap: 3px;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
   }
+
+  .print-report .risk-metric.green,
+  .print-report .risk-metric.gold,
+  .print-report .risk-metric.red {
+    background: #ffffff;
+  }
+
+  .print-report .risk-metric.green strong { color: #12805c; }
+  .print-report .risk-metric.gold strong { color: #a66d00; }
+  .print-report .risk-metric.red strong { color: var(--red); }
 
   .print-report .risk-metric span,
   .print-report .risk-metric small {
@@ -2786,24 +2866,27 @@ label {
   }
 
   .print-report .risk-grid {
-    padding: 8px 12px 12px;
-    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px 0 0;
+    gap: 12px 18px;
   }
 
   .print-report .risk-grid article {
-    background: #fbfcfd;
-    border: 1px solid #d9e4ef;
-    border-left: 3px solid #117a8b;
-    padding: 8px;
+    background: transparent;
+    border: 0;
+    border-top: 3px solid #18a0ae;
+    border-radius: 0;
+    padding: 8px 0 0;
   }
 
   .print-report .risk-grid h3 {
-    color: #117a8b;
-    font-size: 9px;
+    color: #123b52;
+    font-size: 10px;
   }
 
   .print-report .risk-grid p {
-    font-size: 9px;
-    line-height: 1.45;
+    color: #31445c;
+    font-size: 9.5px;
+    line-height: 1.5;
   }
 }

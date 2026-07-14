@@ -2346,6 +2346,8 @@ label {
   .report-insights article {
     min-height: 58px;
     padding: 8px 9px;
+    background: #f4f6f8;
+    border-color: #dbe3ec;
     border-top: 3px solid #cbd5df;
   }
 

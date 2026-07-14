@@ -80,8 +80,10 @@ test("performance history screen is wired into the portfolio dashboard", async (
   assert.match(page, /editCashFlow/);
   assert.match(page, /rangeOptions/);
   assert.match(page, /withTodaySnapshot/);
+  assert.match(page, /dailyCandles/);
   assert.match(page, /chartPoints\("totalValue"\)/);
   assert.match(css, /\.history-chart/);
+  assert.match(css, /\.daily-candles/);
   assert.match(css, /\.cash-flow-form/);
   assert.match(css, /\.return-grid/);
   assert.match(css, /\.target-settings-grid/);

@@ -651,6 +651,37 @@ export default function Home() {
     return { min: Math.max(0, min - padding), max: max + padding };
   }, [historySeries]);
 
+  const dailyCandles = useMemo(() => {
+    const width = Math.max(0.7, Math.min(2.4, 54 / Math.max(historySeries.length, 1)));
+    return historySeries.map((item, index) => {
+      const previous = historySeries[index - 1];
+      const open = previous?.totalValue ?? item.totalValue;
+      const close = item.totalValue;
+      const high = Math.max(open, close);
+      const low = Math.min(open, close);
+      const x = historySeries.length === 1 ? 50 : (index / Math.max(historySeries.length - 1, 1)) * 100;
+      const openY = chartY(open);
+      const closeY = chartY(close);
+      const highY = chartY(high);
+      const lowY = chartY(low);
+      return {
+        date: item.date,
+        x,
+        width,
+        open,
+        close,
+        change: close - open,
+        openY,
+        closeY,
+        highY,
+        lowY,
+        bodyY: Math.min(openY, closeY),
+        bodyHeight: Math.max(Math.abs(closeY - openY), 0.9),
+        trend: close >= open ? "positive" : "negative",
+      };
+    });
+  }, [historySeries, chartBounds]);
+
   const filteredAssets = useMemo(() => {
     return state.assets
       .filter((asset) => {
@@ -1934,12 +1965,30 @@ export default function Home() {
                   <line x1="0" y1="92" x2="100" y2="92" />
                   <line x1="0" y1="50" x2="100" y2="50" />
                   <line x1="0" y1="8" x2="100" y2="8" />
+                  <g className="daily-candles" aria-label="Gunluk yukselis ve dusus igneleri">
+                    {dailyCandles.map((candle) => (
+                      <g className={`history-candle ${candle.trend}`} key={candle.date}>
+                        <line className="candle-wick" x1={candle.x} x2={candle.x} y1={candle.highY} y2={candle.lowY} />
+                        <rect
+                          className="candle-body"
+                          x={candle.x - candle.width / 2}
+                          y={candle.bodyY}
+                          width={candle.width}
+                          height={candle.bodyHeight}
+                          rx="0.35"
+                        />
+                        <title>{`${candle.date}: ${signedMoney(candle.change)}`}</title>
+                      </g>
+                    ))}
+                  </g>
                   <polyline className="cost-line" points={chartPoints("totalCost")} />
                   <polyline className="value-line" points={chartPoints("totalValue")} />
                 </svg>
                 <div className="chart-legend">
                   <span><i className="value-swatch" /> Guncel deger</span>
                   <span><i className="cost-swatch" /> Ana para</span>
+                  <span><i className="daily-up-swatch" /> Gunluk yukselis</span>
+                  <span><i className="daily-down-swatch" /> Gunluk dusus</span>
                 </div>
               </div>
             </section>

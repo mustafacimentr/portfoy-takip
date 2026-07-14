@@ -714,6 +714,46 @@ export default function Home() {
     }));
   }, [state.settings.rebalanceAmount, targetRows]);
 
+  const assetTargetSuggestions = useMemo(() => {
+    const amount = Math.max(0, Number(state.settings.rebalanceAmount || 0));
+    if (!amount) return [];
+    return rebalanceSuggestions
+      .filter((group) => group.suggestedAmount > 0)
+      .flatMap((group) => {
+        const assets = state.assets
+          .filter((asset) => assetGroupKey(asset) === group.key)
+          .map((asset) => {
+            const value = asset.quantity * asset.price * (asset.fxRate || 1);
+            const targetShare = Number(asset.target || 0);
+            const targetValue = targetShare > 0 ? ((totals.totalValue + amount) * targetShare) / 100 : 0;
+            const gapValue = targetShare > 0 ? targetValue - value : 0;
+            return { asset, value, targetShare, targetValue, gapValue };
+          });
+        if (!assets.length) return [];
+
+        const explicit = assets.filter((row) => row.targetShare > 0 && row.gapValue > 0);
+        const pool = explicit.length ? explicit : assets;
+        const totalWeight = explicit.length
+          ? explicit.reduce((sum, row) => sum + row.gapValue, 0)
+          : pool.reduce((sum, row) => sum + Math.max(row.value, 1), 0);
+
+        return pool.map((row) => {
+          const weight = explicit.length ? row.gapValue : Math.max(row.value, 1);
+          const suggestedAmount = totalWeight ? (group.suggestedAmount * weight) / totalWeight : 0;
+          return {
+            ...row,
+            groupKey: group.key,
+            groupLabel: group.label,
+            color: groupColors[group.key] || "#647181",
+            suggestedAmount,
+            reason: explicit.length ? "Varlik hedef payi eksik" : "Sinif hedefi eksik",
+          };
+        });
+      })
+      .filter((row) => row.suggestedAmount > 0)
+      .sort((left, right) => right.suggestedAmount - left.suggestedAmount);
+  }, [rebalanceSuggestions, state.assets, state.settings.rebalanceAmount, totals.totalValue]);
+
   const rebalanceHealth = useMemo(() => {
     const maxDeviation = targetRows.reduce((max, row) => Math.max(max, Math.abs(row.gapShare)), 0);
     const missingCount = targetRows.filter((row) => row.status === "missing").length;
@@ -1979,6 +2019,33 @@ export default function Home() {
                     <strong>{money(row.suggestedAmount)}</strong>
                   </div>
                 )) : <div className="empty">Hedefe gore eksik sinif yok. Yeni yatirim icin portfoy zaten dengeli gorunuyor.</div>}
+              </div>
+            </section>
+
+            <section className="panel asset-target-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Varlik Bazinda Hedef Onerileri</h2>
+                  <p>Yeni yatirim tutarini eksik kalan siniflarin icindeki varliklara pratik sekilde paylastirir.</p>
+                </div>
+              </div>
+              <div className="asset-target-list">
+                {assetTargetSuggestions.length ? assetTargetSuggestions.map((row) => {
+                  const approximateQuantity = row.asset.price > 0 ? row.suggestedAmount / (row.asset.price * (row.asset.fxRate || 1)) : 0;
+                  const targetHint = row.targetShare > 0 ? `Hedef pay ${pct(row.targetShare)}` : row.reason;
+                  return (
+                    <div className="asset-target-row" key={`${row.groupKey}-${row.asset.id}`}>
+                      <AssetLogo asset={row.asset} color={row.color} />
+                      <div>
+                        <strong>{row.asset.ticker}</strong>
+                        <small>{row.groupLabel} · {targetHint}</small>
+                      </div>
+                      <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(3, (row.suggestedAmount / Math.max(state.settings.rebalanceAmount || 1, 1)) * 100)}%`, background: row.color }} /></div>
+                      <span>{approximateQuantity > 0 ? `${num(approximateQuantity)} adet` : "-"}</span>
+                      <b>{money(row.suggestedAmount)}</b>
+                    </div>
+                  );
+                }) : <div className="empty">Varlik bazinda oneriyi hesaplamak icin yeni yatirim tutari ve hedefte eksik kalan bir sinif gerekir.</div>}
               </div>
             </section>
           </>

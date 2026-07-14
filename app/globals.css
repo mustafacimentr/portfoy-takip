@@ -829,7 +829,8 @@ select:focus {
 }
 
 .targets-panel,
-.rebalance-panel {
+.rebalance-panel,
+.asset-target-panel {
   overflow: hidden;
 }
 
@@ -923,6 +924,45 @@ select:focus {
 }
 
 .rebalance-row strong {
+  text-align: right;
+}
+
+.asset-target-list {
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.asset-target-row {
+  display: grid;
+  grid-template-columns: 34px 180px minmax(160px, 1fr) 110px 130px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfd;
+  font-size: 13px;
+}
+
+.asset-target-row strong,
+.asset-target-row b {
+  color: var(--ink);
+}
+
+.asset-target-row small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.asset-target-row span {
+  color: var(--muted);
+  text-align: right;
+  font-weight: 800;
+}
+
+.asset-target-row b {
   text-align: right;
 }
 
@@ -1891,6 +1931,7 @@ label {
   .return-breakdown,
   .target-settings-grid,
   .rebalance-row,
+  .asset-target-row,
   .benchmark-grid,
   .source-grid,
   .transaction-form,

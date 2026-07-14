@@ -92,6 +92,8 @@ test("performance history screen is wired into the portfolio dashboard", async (
   assert.match(css, /\.return-grid/);
   assert.match(css, /\.target-settings-grid/);
   assert.match(css, /\.rebalance-row/);
+  assert.match(css, /--report-navy/);
+  assert.match(css, /--report-gold/);
   assert.match(css, /\.benchmark-grid/);
   assert.match(css, /\.comparison-table/);
   assert.match(css, /\.source-grid/);

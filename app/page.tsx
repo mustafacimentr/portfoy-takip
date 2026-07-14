@@ -511,6 +511,7 @@ export default function Home() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [activeTab, setActiveTab] = useState<(typeof menuItems)[number]["key"]>("distribution");
   const [historyRange, setHistoryRange] = useState<(typeof rangeOptions)[number]["key"]>("1m");
+  const [hoveredHistoryIndex, setHoveredHistoryIndex] = useState<number | null>(null);
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
@@ -1950,7 +1951,10 @@ export default function Home() {
                     <button
                       key={option.key}
                       className={historyRange === option.key ? "active" : ""}
-                      onClick={() => setHistoryRange(option.key)}
+                      onClick={() => {
+                        setHistoryRange(option.key);
+                        setHoveredHistoryIndex(null);
+                      }}
                     >
                       {option.label}
                     </button>
@@ -1963,29 +1967,64 @@ export default function Home() {
                   <span>En dusuk: <strong>{money(performanceStats.low)}</strong></span>
                   <span>Kayit sayisi: <strong>{historySeries.length}</strong></span>
                 </div>
-                <svg className="history-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Portfoy performans grafigi">
-                  <line x1="0" y1="92" x2="100" y2="92" />
-                  <line x1="0" y1="50" x2="100" y2="50" />
-                  <line x1="0" y1="8" x2="100" y2="8" />
-                  <polyline className="cost-line" points={chartPoints("totalCost")} />
-                  <polyline className="value-line" points={chartPoints("totalValue")} />
-                  <g className="daily-candles" aria-label="Gunluk yukselis ve dusus igneleri">
-                    {dailyCandles.map((candle) => (
-                      <g className={`history-candle ${candle.trend}`} key={candle.date}>
-                        <line className="candle-wick" x1={candle.x} x2={candle.x} y1={candle.highY} y2={candle.lowY} />
-                        <rect
-                          className="candle-body"
-                          x={candle.x - candle.width / 2}
-                          y={candle.bodyY}
-                          width={candle.width}
-                          height={candle.bodyHeight}
-                          rx="0.35"
-                        />
-                        <title>{`${candle.date}: ${signedMoney(candle.change)}`}</title>
+                <div className="history-chart-stage" onMouseLeave={() => setHoveredHistoryIndex(null)}>
+                  <svg className="history-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Portfoy performans grafigi">
+                    <line x1="0" y1="92" x2="100" y2="92" />
+                    <line x1="0" y1="50" x2="100" y2="50" />
+                    <line x1="0" y1="8" x2="100" y2="8" />
+                    <polyline className="cost-line" points={chartPoints("totalCost")} />
+                    <polyline className="value-line" points={chartPoints("totalValue")} />
+                    <g className="daily-candles" aria-label="Gunluk yukselis ve dusus igneleri">
+                      {dailyCandles.map((candle) => (
+                        <g className={`history-candle ${candle.trend}`} key={candle.date}>
+                          <line className="candle-wick" x1={candle.x} x2={candle.x} y1={candle.highY} y2={candle.lowY} />
+                          <rect
+                            className="candle-body"
+                            x={candle.x - candle.width / 2}
+                            y={candle.bodyY}
+                            width={candle.width}
+                            height={candle.bodyHeight}
+                            rx="0.35"
+                          />
+                        </g>
+                      ))}
+                    </g>
+                    {hoveredHistoryIndex !== null && dailyCandles[hoveredHistoryIndex] && (
+                      <g className="history-hover-markers">
+                        <line x1={dailyCandles[hoveredHistoryIndex].x} x2={dailyCandles[hoveredHistoryIndex].x} y1="8" y2="92" />
+                        <circle className="value-marker" cx={dailyCandles[hoveredHistoryIndex].x} cy={chartY(historySeries[hoveredHistoryIndex].totalValue)} r="1.15" />
+                        <circle className="cost-marker" cx={dailyCandles[hoveredHistoryIndex].x} cy={chartY(historySeries[hoveredHistoryIndex].totalCost)} r="1.15" />
                       </g>
-                    ))}
-                  </g>
-                </svg>
+                    )}
+                    <g className="history-hit-zones">
+                      {dailyCandles.map((candle, index) => {
+                        const hitWidth = Math.max(4, 96 / Math.max(dailyCandles.length, 1));
+                        return (
+                          <rect
+                            key={candle.date}
+                            x={Math.max(0, candle.x - hitWidth / 2)}
+                            y="0"
+                            width={Math.min(hitWidth, 100 - Math.max(0, candle.x - hitWidth / 2))}
+                            height="100"
+                            onMouseEnter={() => setHoveredHistoryIndex(index)}
+                            onTouchStart={() => setHoveredHistoryIndex(index)}
+                          />
+                        );
+                      })}
+                    </g>
+                  </svg>
+                  {hoveredHistoryIndex !== null && historySeries[hoveredHistoryIndex] && dailyCandles[hoveredHistoryIndex] && (
+                    <div
+                      className={`history-tooltip ${dailyCandles[hoveredHistoryIndex].x < 24 ? "align-left" : dailyCandles[hoveredHistoryIndex].x > 76 ? "align-right" : ""}`}
+                      style={{ left: `${dailyCandles[hoveredHistoryIndex].x}%` }}
+                    >
+                      <strong>{historySeries[hoveredHistoryIndex].date.split("-").reverse().join(".")}</strong>
+                      <span><i className="tooltip-value-dot" />Guncel deger <b>{money(historySeries[hoveredHistoryIndex].totalValue)}</b></span>
+                      <span><i className="tooltip-cost-dot" />Ana para <b>{money(historySeries[hoveredHistoryIndex].totalCost)}</b></span>
+                      <span className={dailyCandles[hoveredHistoryIndex].change >= 0 ? "positive" : "negative"}>Gunluk degisim <b>{signedMoney(dailyCandles[hoveredHistoryIndex].change)}</b></span>
+                    </div>
+                  )}
+                </div>
                 <div className="history-date-axis" aria-label="Grafik tarihleri">
                   {historySeries.map((item, index) => {
                     const interval = Math.max(1, Math.ceil(historySeries.length / 7));

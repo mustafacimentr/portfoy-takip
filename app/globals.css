@@ -669,6 +669,10 @@ select:focus {
   overflow: visible;
 }
 
+.history-chart-stage {
+  position: relative;
+}
+
 .history-chart line {
   stroke: #e3e9f0;
   stroke-width: 0.35;
@@ -683,7 +687,7 @@ select:focus {
 }
 
 .history-chart .value-line {
-  stroke: var(--green);
+  stroke: var(--blue);
 }
 
 .history-chart .cost-line {
@@ -727,6 +731,89 @@ select:focus {
   stroke: #c43b31;
 }
 
+.history-hit-zones rect {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.history-hover-markers line {
+  stroke: #8794a6;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.history-hover-markers circle {
+  stroke: #fff;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.history-hover-markers .value-marker {
+  fill: var(--blue);
+}
+
+.history-hover-markers .cost-marker {
+  fill: #d19a18;
+}
+
+.history-tooltip {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  padding: 11px 12px;
+  transform: translateX(-50%);
+  border: 1px solid #cad5e2;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8px 24px rgba(16, 36, 63, 0.16);
+  color: var(--ink);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.history-tooltip.align-left {
+  transform: translateX(0);
+}
+
+.history-tooltip.align-right {
+  transform: translateX(-100%);
+}
+
+.history-tooltip strong {
+  font-size: 13px;
+}
+
+.history-tooltip span {
+  display: grid;
+  grid-template-columns: 9px 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.history-tooltip span:last-child {
+  grid-template-columns: 1fr auto;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.history-tooltip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tooltip-value-dot {
+  background: var(--blue);
+}
+
+.tooltip-cost-dot {
+  background: #d19a18;
+}
+
 .chart-legend {
   display: flex;
   gap: 14px;
@@ -749,7 +836,7 @@ select:focus {
 }
 
 .value-swatch {
-  background: var(--green);
+  background: var(--blue);
 }
 
 .cost-swatch {

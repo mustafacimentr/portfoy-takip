@@ -23,6 +23,8 @@ type Asset = {
   lastPriceError?: string;
   previousPrice?: number;
   previousPriceAt?: string;
+  dayOpenPrice?: number;
+  dayOpenDate?: string;
   logoUrl?: string;
 };
 
@@ -335,6 +337,20 @@ function totalsFromAssets(assets: Asset[]) {
   return { totalValue, totalCost, cash, profitLoss, rate: totalCost ? (profitLoss / totalCost) * 100 : 0 };
 }
 
+function dailyBasePrice(asset: Asset, today = plainDate()) {
+  if (asset.dayOpenDate === today && Number(asset.dayOpenPrice || 0) > 0) return Number(asset.dayOpenPrice);
+  if (Number(asset.previousPrice || 0) > 0 && asset.previousPriceAt?.slice(0, 10) === today) return Number(asset.previousPrice);
+  return 0;
+}
+
+function nextDailyPriceAnchor(asset: Asset, today = plainDate()) {
+  const existingOpen = asset.dayOpenDate === today && Number(asset.dayOpenPrice || 0) > 0 ? Number(asset.dayOpenPrice) : 0;
+  return {
+    dayOpenPrice: existingOpen || Number(asset.price || 0),
+    dayOpenDate: today,
+  };
+}
+
 function normalizeSnapshot(snapshot: Partial<PortfolioSnapshot>): PortfolioSnapshot {
   return {
     id: snapshot.id || uid(),
@@ -480,6 +496,8 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
     lastPriceError: asset.lastPriceError,
     previousPrice: Number.isFinite(Number(asset.previousPrice)) ? Number(asset.previousPrice) : undefined,
     previousPriceAt: asset.previousPriceAt,
+    dayOpenPrice: Number.isFinite(Number(asset.dayOpenPrice)) ? Number(asset.dayOpenPrice) : undefined,
+    dayOpenDate: asset.dayOpenDate,
     logoUrl: asset.logoUrl,
   };
 }
@@ -817,9 +835,9 @@ export default function Home() {
       .map((asset) => {
         const value = asset.quantity * asset.price * (asset.fxRate || 1);
         const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
-        const previousPrice = Number(asset.previousPrice || 0);
-        const previousValue = previousPrice > 0 ? asset.quantity * previousPrice * (asset.fxRate || 1) : 0;
-        const dailyChange = previousValue ? value - previousValue : 0;
+        const basePrice = dailyBasePrice(asset);
+        const baseValue = basePrice > 0 ? asset.quantity * basePrice * (asset.fxRate || 1) : 0;
+        const dailyChange = baseValue ? value - baseValue : 0;
         const code = compactCode(asset.ticker).slice(0, 2) || "PF";
         const groupKey = assetGroupKey(asset);
         return {
@@ -829,8 +847,8 @@ export default function Home() {
           profitLoss: value - cost,
           returnRate: cost ? ((value - cost) / cost) * 100 : 0,
           dailyChange,
-          dailyRate: previousValue ? (dailyChange / previousValue) * 100 : 0,
-          hasDailyChange: previousValue > 0,
+          dailyRate: baseValue ? (dailyChange / baseValue) * 100 : 0,
+          hasDailyChange: baseValue > 0,
           share: totals.totalValue ? (value / totals.totalValue) * 100 : 0,
           initials: code,
           color: groupColors[groupKey] || colors[assetGroupIndex(asset) % colors.length],
@@ -1253,13 +1271,14 @@ export default function Home() {
     if (!passcode || !state.assets.length) return;
     setLoading(true);
     try {
+      const today = plainDate();
       const updated = await Promise.all(
         state.assets.map(async (asset) => {
           if (!asset.autoUpdate || asset.priceSource === "manual") return asset;
           try {
             const result = await fetchPrice(asset);
             const nextPrice = Number(result.price);
-            return { ...asset, previousPrice: asset.price, previousPriceAt: asset.lastPriceAt, price: nextPrice, lastPriceAt: new Date().toISOString(), lastPriceError: "" };
+            return { ...asset, ...nextDailyPriceAnchor(asset, today), previousPrice: asset.price, previousPriceAt: asset.lastPriceAt, price: nextPrice, lastPriceAt: new Date().toISOString(), lastPriceError: "" };
           } catch (error) {
             return { ...asset, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
           }
@@ -1279,9 +1298,10 @@ export default function Home() {
     setLoading(true);
     try {
       let nextAsset = target;
+      const today = plainDate();
       try {
         const result = await fetchPrice(target);
-        nextAsset = { ...target, autoUpdate: true, previousPrice: target.price, previousPriceAt: target.lastPriceAt, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
+        nextAsset = { ...target, autoUpdate: true, ...nextDailyPriceAnchor(target, today), previousPrice: target.price, previousPriceAt: target.lastPriceAt, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
       } catch (error) {
         nextAsset = { ...target, autoUpdate: true, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
       }

@@ -2710,8 +2710,11 @@ export default function Home() {
                             <span>{index + 1}</span>
                             <AssetLogo asset={row.asset} color={row.color} small />
                             <strong>{row.asset.ticker}</strong>
-                            <b className={amount >= 0 ? "positive" : "negative"}>{absoluteMoney(amount)}</b>
-                            <em className={amount >= 0 ? "positive" : "negative"}>{signedPct(rate)}</em>
+                            <b className={amount >= 0 ? "positive" : "negative"}>
+                              <i className={`trend-triangle ${amount >= 0 ? "up" : "down"}`} />
+                              {absoluteMoney(amount)}
+                              <em>{signedPct(rate)}</em>
+                            </b>
                           </div>
                         );
                       }) : (

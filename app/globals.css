@@ -2785,11 +2785,12 @@ label {
 
   .report-radar-row {
     display: grid;
-    grid-template-columns: 14px 18px minmax(36px, 1fr);
+    grid-template-columns: 14px 18px minmax(54px, 1fr);
     grid-template-areas:
       "rank logo ticker"
       "rank logo amount";
-    gap: 0 5px;
+    column-gap: 9px;
+    row-gap: 1px;
     align-items: center;
     padding: 5px 0;
     border-top: 1px solid #e1e8f0;
@@ -2811,15 +2812,28 @@ label {
   .report-radar-row strong {
     grid-area: ticker;
     font-size: 9px;
+    padding-left: 2px;
   }
 
   .report-radar-row b {
     grid-area: amount;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     font-size: 8px;
+    padding-left: 2px;
   }
 
-  .report-radar-row em {
-    display: none;
+  .report-radar-row b .trend-triangle {
+    transform: scale(0.55);
+    transform-origin: center;
+  }
+
+  .report-radar-row b em {
+    display: inline;
+    font-style: normal;
+    font-weight: 900;
+    opacity: 0.9;
   }
 
   .report-radar-empty {

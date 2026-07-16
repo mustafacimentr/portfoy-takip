@@ -1280,6 +1280,11 @@ select:focus {
   background: #f5f8fb;
 }
 
+.fund-dataset-head > div {
+  min-width: 0;
+  flex: 1;
+}
+
 .fund-dataset-head strong {
   display: block;
   color: var(--ink);
@@ -1287,6 +1292,30 @@ select:focus {
 
 .fund-dataset-head small {
   color: var(--muted);
+}
+
+.mini-action {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.fund-sync-status {
+  margin: 12px 18px 0;
+  border: 1px solid #f0d58d;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #8a6500;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.fund-sync-status.success {
+  border-color: #a9e7d0;
+  background: #eefaf5;
+  color: var(--green);
 }
 
 .fund-dataset-rows {

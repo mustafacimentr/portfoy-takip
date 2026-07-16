@@ -74,6 +74,8 @@ type FundHolding = {
   weight: number;
   sector: string;
   country: string;
+  source?: string;
+  asOf?: string;
 };
 
 type PortfolioSettings = {
@@ -105,31 +107,31 @@ const defaultTargetAllocations: Record<string, number> = {
 
 const defaultFundHoldings: Record<string, FundHolding[]> = {
   TMG: [
-    { id: "TMG-MSFT", fundCode: "TMG", symbol: "MSFT", name: "Microsoft", weight: 8.5, sector: "Teknoloji", country: "ABD" },
-    { id: "TMG-NVDA", fundCode: "TMG", symbol: "NVDA", name: "Nvidia", weight: 7.8, sector: "Yari iletken", country: "ABD" },
-    { id: "TMG-AAPL", fundCode: "TMG", symbol: "AAPL", name: "Apple", weight: 7.2, sector: "Teknoloji", country: "ABD" },
-    { id: "TMG-GOOGL", fundCode: "TMG", symbol: "GOOGL", name: "Alphabet", weight: 5.6, sector: "Iletisim", country: "ABD" },
-    { id: "TMG-AMZN", fundCode: "TMG", symbol: "AMZN", name: "Amazon", weight: 4.8, sector: "Tuketim", country: "ABD" },
+    { id: "TMG-MSFT", fundCode: "TMG", symbol: "MSFT", name: "Microsoft", weight: 8.5, sector: "Teknoloji", country: "ABD", source: "Baslangic katalog" },
+    { id: "TMG-NVDA", fundCode: "TMG", symbol: "NVDA", name: "Nvidia", weight: 7.8, sector: "Yari iletken", country: "ABD", source: "Baslangic katalog" },
+    { id: "TMG-AAPL", fundCode: "TMG", symbol: "AAPL", name: "Apple", weight: 7.2, sector: "Teknoloji", country: "ABD", source: "Baslangic katalog" },
+    { id: "TMG-GOOGL", fundCode: "TMG", symbol: "GOOGL", name: "Alphabet", weight: 5.6, sector: "Iletisim", country: "ABD", source: "Baslangic katalog" },
+    { id: "TMG-AMZN", fundCode: "TMG", symbol: "AMZN", name: "Amazon", weight: 4.8, sector: "Tuketim", country: "ABD", source: "Baslangic katalog" },
   ],
   TGE: [
-    { id: "TGE-GLD", fundCode: "TGE", symbol: "ALTIN", name: "Altin ve altin fonlari", weight: 35, sector: "Emtia", country: "Kuresel" },
-    { id: "TGE-SLV", fundCode: "TGE", symbol: "GUMUS", name: "Gumus ve degerli metaller", weight: 18, sector: "Emtia", country: "Kuresel" },
-    { id: "TGE-ENERGY", fundCode: "TGE", symbol: "ENERJI", name: "Enerji emtialari", weight: 14, sector: "Emtia", country: "Kuresel" },
-    { id: "TGE-MINING", fundCode: "TGE", symbol: "MADEN", name: "Maden sirketleri", weight: 10, sector: "Maden", country: "Kuresel" },
+    { id: "TGE-GLD", fundCode: "TGE", symbol: "ALTIN", name: "Altin ve altin fonlari", weight: 35, sector: "Emtia", country: "Kuresel", source: "Baslangic katalog" },
+    { id: "TGE-SLV", fundCode: "TGE", symbol: "GUMUS", name: "Gumus ve degerli metaller", weight: 18, sector: "Emtia", country: "Kuresel", source: "Baslangic katalog" },
+    { id: "TGE-ENERGY", fundCode: "TGE", symbol: "ENERJI", name: "Enerji emtialari", weight: 14, sector: "Emtia", country: "Kuresel", source: "Baslangic katalog" },
+    { id: "TGE-MINING", fundCode: "TGE", symbol: "MADEN", name: "Maden sirketleri", weight: 10, sector: "Maden", country: "Kuresel", source: "Baslangic katalog" },
   ],
   KPH: [
-    { id: "KPH-TUPRS", fundCode: "KPH", symbol: "TUPRS", name: "Tupras", weight: 8.2, sector: "Enerji", country: "Turkiye" },
-    { id: "KPH-BIMAS", fundCode: "KPH", symbol: "BIMAS", name: "Bim Birlesik Magazalar", weight: 7.6, sector: "Perakende", country: "Turkiye" },
-    { id: "KPH-FROTO", fundCode: "KPH", symbol: "FROTO", name: "Ford Otosan", weight: 6.9, sector: "Otomotiv", country: "Turkiye" },
-    { id: "KPH-AKBNK", fundCode: "KPH", symbol: "AKBNK", name: "Akbank", weight: 5.8, sector: "Banka", country: "Turkiye" },
-    { id: "KPH-ASELS", fundCode: "KPH", symbol: "ASELS", name: "Aselsan", weight: 4.7, sector: "Savunma", country: "Turkiye" },
+    { id: "KPH-TUPRS", fundCode: "KPH", symbol: "TUPRS", name: "Tupras", weight: 8.2, sector: "Enerji", country: "Turkiye", source: "Baslangic katalog" },
+    { id: "KPH-BIMAS", fundCode: "KPH", symbol: "BIMAS", name: "Bim Birlesik Magazalar", weight: 7.6, sector: "Perakende", country: "Turkiye", source: "Baslangic katalog" },
+    { id: "KPH-FROTO", fundCode: "KPH", symbol: "FROTO", name: "Ford Otosan", weight: 6.9, sector: "Otomotiv", country: "Turkiye", source: "Baslangic katalog" },
+    { id: "KPH-AKBNK", fundCode: "KPH", symbol: "AKBNK", name: "Akbank", weight: 5.8, sector: "Banka", country: "Turkiye", source: "Baslangic katalog" },
+    { id: "KPH-ASELS", fundCode: "KPH", symbol: "ASELS", name: "Aselsan", weight: 4.7, sector: "Savunma", country: "Turkiye", source: "Baslangic katalog" },
   ],
   AFT: [
-    { id: "AFT-NVDA", fundCode: "AFT", symbol: "NVDA", name: "Nvidia", weight: 9.4, sector: "Yari iletken", country: "ABD" },
-    { id: "AFT-MSFT", fundCode: "AFT", symbol: "MSFT", name: "Microsoft", weight: 8.1, sector: "Teknoloji", country: "ABD" },
-    { id: "AFT-AAPL", fundCode: "AFT", symbol: "AAPL", name: "Apple", weight: 6.4, sector: "Teknoloji", country: "ABD" },
-    { id: "AFT-META", fundCode: "AFT", symbol: "META", name: "Meta Platforms", weight: 5.2, sector: "Iletisim", country: "ABD" },
-    { id: "AFT-AVGO", fundCode: "AFT", symbol: "AVGO", name: "Broadcom", weight: 4.8, sector: "Yari iletken", country: "ABD" },
+    { id: "AFT-NVDA", fundCode: "AFT", symbol: "NVDA", name: "Nvidia", weight: 9.4, sector: "Yari iletken", country: "ABD", source: "Baslangic katalog" },
+    { id: "AFT-MSFT", fundCode: "AFT", symbol: "MSFT", name: "Microsoft", weight: 8.1, sector: "Teknoloji", country: "ABD", source: "Baslangic katalog" },
+    { id: "AFT-AAPL", fundCode: "AFT", symbol: "AAPL", name: "Apple", weight: 6.4, sector: "Teknoloji", country: "ABD", source: "Baslangic katalog" },
+    { id: "AFT-META", fundCode: "AFT", symbol: "META", name: "Meta Platforms", weight: 5.2, sector: "Iletisim", country: "ABD", source: "Baslangic katalog" },
+    { id: "AFT-AVGO", fundCode: "AFT", symbol: "AVGO", name: "Broadcom", weight: 4.8, sector: "Yari iletken", country: "ABD", source: "Baslangic katalog" },
   ],
 };
 
@@ -438,6 +440,8 @@ function normalizeFundHolding(fundCode: string, holding: Partial<FundHolding>): 
     weight: Math.max(0, Math.min(100, Number(holding.weight || 0))),
     sector: String(holding.sector || "Belirtilmedi"),
     country: String(holding.country || "Belirtilmedi"),
+    source: holding.source ? String(holding.source) : undefined,
+    asOf: holding.asOf ? String(holding.asOf) : undefined,
   };
 }
 
@@ -622,6 +626,7 @@ export default function Home() {
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
   const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
   const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
+  const [fundSyncStatus, setFundSyncStatus] = useState("");
   const [lastSync, setLastSync] = useState("");
 
   useEffect(() => {
@@ -1980,6 +1985,40 @@ export default function Home() {
     }, { snapshot: false });
   }
 
+  async function syncFundHoldings(fundCode?: string) {
+    const codes = fundCode ? [compactCode(fundCode)] : fundAssets.map((row) => compactCode(row.asset.ticker || row.asset.priceSymbol));
+    const uniqueCodes = [...new Set(codes.filter(Boolean))];
+    if (!uniqueCodes.length) return;
+    setFundSyncStatus("Fon icerikleri kontrol ediliyor...");
+    setLoading(true);
+    try {
+      const query = uniqueCodes.length === 1
+        ? `code=${encodeURIComponent(uniqueCodes[0])}`
+        : `codes=${encodeURIComponent(uniqueCodes.join(","))}`;
+      const data = await api<{ funds?: Array<{ fundCode: string; ok: boolean; holdings: Partial<FundHolding>[]; message?: string }> }>(`/api/fund-holdings?${query}`, passcode);
+      const settings = normalizeSettings(state.settings);
+      const nextHoldings = { ...settings.fundHoldings };
+      let updatedCount = 0;
+      let missingCount = 0;
+      (data.funds || []).forEach((fund) => {
+        const code = compactCode(fund.fundCode);
+        const rows = (fund.holdings || []).map((holding) => normalizeFundHolding(code, holding));
+        if (fund.ok && rows.length) {
+          nextHoldings[code] = rows;
+          updatedCount += 1;
+        } else {
+          missingCount += 1;
+        }
+      });
+      await savePortfolio({ ...state, settings: { ...settings, fundHoldings: nextHoldings } }, { snapshot: false });
+      setFundSyncStatus(`${updatedCount} fon icerigi guncellendi${missingCount ? `, ${missingCount} fon icin otomatik kaynak yok` : ""}.`);
+    } catch (error) {
+      setFundSyncStatus(error instanceof Error ? error.message : "Fon icerikleri guncellenemedi");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function chartPoints(key: "totalValue" | "totalCost") {
     if (historySeries.length === 1) {
       const y = chartY(historySeries[0][key]);
@@ -2661,7 +2700,11 @@ export default function Home() {
                   <h2>Fon Icerik Veri Seti</h2>
                   <p>Yeni fon veya alt varlik ekle; ayni sembol tekrar eklenirse ilgili kayit guncellenir.</p>
                 </div>
+                <div className="row-actions">
+                  <button className="primary" onClick={() => void syncFundHoldings()} disabled={loading || !fundAssets.length}>Otomatik doldur</button>
+                </div>
               </div>
+              {fundSyncStatus ? <div className={`fund-sync-status ${/guncellendi/i.test(fundSyncStatus) ? "success" : ""}`}>{fundSyncStatus}</div> : null}
               <form className="fund-holding-form" onSubmit={(event) => void saveFundHolding(event)}>
                 <label>Fon
                   <select value={fundHoldingDraft.fundCode || fundAssets[0]?.asset.ticker || ""} onChange={(event) => setFundHoldingDraft({ ...fundHoldingDraft, fundCode: event.target.value })}>
@@ -2690,11 +2733,14 @@ export default function Home() {
                 {fundAssets.map((fundRow) => {
                   const code = compactCode(fundRow.asset.ticker || fundRow.asset.priceSymbol);
                   const holdings = fundLookthrough.settings.fundHoldings[code] || [];
+                  const sourceText = holdings[0]?.source || "Manuel veri";
+                  const asOfText = holdings[0]?.asOf ? ` · ${holdings[0].asOf}` : "";
                   return (
                     <article className="fund-dataset-card" key={fundRow.asset.id}>
                       <div className="fund-dataset-head">
                         <AssetLogo asset={fundRow.asset} color={groupColors.fund} />
-                        <div><strong>{code}</strong><small>{holdings.length} kayit Â· Fon degeri {money(fundRow.value)}</small></div>
+                        <div><strong>{code}</strong><small>{holdings.length} kayit · {sourceText}{asOfText} · Fon degeri {money(fundRow.value)}</small></div>
+                        <button className="secondary mini-action" onClick={() => void syncFundHoldings(code)} disabled={loading} type="button">Yenile</button>
                       </div>
                       <div className="fund-dataset-rows">
                         {holdings.length ? holdings.map((holding) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 
 type Asset = {
@@ -695,6 +695,7 @@ export default function Home() {
   const [draftPasscode, setDraftPasscode] = useState("");
   const [authError, setAuthError] = useState("");
   const [state, setState] = useState<PortfolioState>(emptyState);
+  const stateRef = useRef<PortfolioState>(emptyState);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
@@ -712,6 +713,10 @@ export default function Home() {
   const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
   const [fundSyncStatus, setFundSyncStatus] = useState("");
   const [lastSync, setLastSync] = useState("");
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     fetch("/api/auth/status")
@@ -1526,9 +1531,21 @@ export default function Home() {
     };
   }
 
-  async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean } = {}) {
+  function withLatestFundHoldings(nextState: PortfolioState) {
+    const latestSettings = normalizeSettings(stateRef.current.settings);
+    const nextSettings = normalizeSettings(nextState.settings);
+    const fundHoldings = { ...nextSettings.fundHoldings };
+    Object.entries(latestSettings.fundHoldings).forEach(([code, latestRows]) => {
+      const nextRows = fundHoldings[code] || [];
+      if (latestRows.length > nextRows.length) fundHoldings[code] = latestRows;
+    });
+    return { ...nextState, settings: { ...nextSettings, fundHoldings } };
+  }
+
+  async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean; preserveFundHoldings?: boolean } = {}) {
     const shouldSnapshot = options.snapshot !== false;
-    const finalState = shouldSnapshot ? withTodaySnapshot(nextState) : nextState;
+    const protectedState = options.preserveFundHoldings ? withLatestFundHoldings(nextState) : nextState;
+    const finalState = shouldSnapshot ? withTodaySnapshot(protectedState) : protectedState;
     setState(finalState);
     setSaving(true);
     try {
@@ -1560,7 +1577,7 @@ export default function Home() {
         }),
       );
       const benchmarkHistory = await collectBenchmarkHistory(state.benchmarkHistory);
-      await savePortfolio({ ...state, assets: updated, benchmarkHistory });
+      await savePortfolio({ ...state, assets: updated, benchmarkHistory }, { preserveFundHoldings: true });
     } finally {
       setLoading(false);
     }
@@ -1580,7 +1597,7 @@ export default function Home() {
       } catch (error) {
         nextAsset = { ...target, autoUpdate: true, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
       }
-      await savePortfolio({ ...state, assets: state.assets.map((asset) => (asset.id === id ? nextAsset : asset)) });
+      await savePortfolio({ ...state, assets: state.assets.map((asset) => (asset.id === id ? nextAsset : asset)) }, { preserveFundHoldings: true });
     } finally {
       setLoading(false);
     }

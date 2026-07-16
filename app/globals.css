@@ -3304,6 +3304,58 @@ label {
     font-size: 18px;
   }
 
+  .fund-report-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .fund-report-title h1 {
+    margin: 0;
+  }
+
+  .fund-report-title p {
+    margin: 2px 0 0;
+  }
+
+  .isbank-report-logo {
+    position: relative;
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid #b7cbe0;
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at 50% 50%, #ffffff 0 36%, transparent 37%),
+      linear-gradient(135deg, #0f63ad, #043b78);
+    box-shadow: inset 0 0 0 2px #ffffff;
+    color: #06447f;
+    font-weight: 950;
+    line-height: 1;
+  }
+
+  .isbank-report-logo span {
+    position: relative;
+    z-index: 1;
+    transform: translateY(-1px);
+    font-size: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .isbank-report-logo::after {
+    content: "";
+    position: absolute;
+    bottom: 7px;
+    left: 9px;
+    width: 12px;
+    height: 3px;
+    border-radius: 999px;
+    background: #d71920;
+  }
+
   .fund-detail-panel {
     overflow: visible;
   }

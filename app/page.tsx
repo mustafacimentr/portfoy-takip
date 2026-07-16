@@ -3372,9 +3372,12 @@ export default function Home() {
           {reportFundCards.map((fund) => (
             <section className={`report-page fund-report-page fund-detail-page ${fund.rows.length > 36 ? "dense" : ""}`} key={fund.code}>
               <div className="report-hero compact">
-                <div>
-                  <h1>{fund.code} Fon Icerigi</h1>
-                  <p>{fund.source}{fund.asOf ? ` - ${fund.asOf}` : ""}</p>
+                <div className="fund-report-title">
+                  <span className="isbank-report-logo" aria-hidden="true"><span>IS</span></span>
+                  <div>
+                    <h1>{fund.code} Fon Icerigi</h1>
+                    <p>{fund.source}{fund.asOf ? ` - ${fund.asOf}` : ""}</p>
+                  </div>
                 </div>
                 <strong>{pct(fund.totalsInfo.knownWeight)}</strong>
               </div>

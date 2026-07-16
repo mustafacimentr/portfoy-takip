@@ -965,10 +965,31 @@ export default function Home() {
 
   const fundLookthrough = useMemo(() => {
     const settings = normalizeSettings(state.settings);
+    const fundTotals: Record<string, { knownWeight: number; missingWeight: number; overWeight: number }> = {};
     const holdingRows = fundAssets.flatMap((fundRow) => {
       const fundCode = compactCode(fundRow.asset.ticker || fundRow.asset.priceSymbol);
       const holdings = settings.fundHoldings[fundCode] || [];
-      return holdings.map((holding) => {
+      const knownWeight = holdings.reduce((sum, holding) => sum + Number(holding.weight || 0), 0);
+      const missingWeight = Math.max(0, 100 - knownWeight);
+      const overWeight = Math.max(0, knownWeight - 100);
+      fundTotals[fundCode] = { knownWeight, missingWeight, overWeight };
+      const completeHoldings = missingWeight > 0.05
+        ? [
+            ...holdings,
+            normalizeFundHolding(fundCode, {
+              id: `${fundCode}-DIGER`,
+              fundCode,
+              symbol: `DIGER${fundCode}`,
+              name: "Diger / aciklanmayan kisim",
+              weight: missingWeight,
+              sector: "Diger",
+              country: "Belirtilmedi",
+              source: holdings[0]?.source || "Tamamlayici hesap",
+              asOf: holdings[0]?.asOf,
+            }),
+          ]
+        : holdings;
+      return completeHoldings.map((holding) => {
         const indirectValue = (fundRow.value * holding.weight) / 100;
         return {
           ...holding,
@@ -1044,6 +1065,7 @@ export default function Home() {
       pairs,
       topOverlap,
       fundsWithData,
+      fundTotals,
       coverage: fundAssets.length ? (fundsWithData / fundAssets.length) * 100 : 0,
       sectors: Array.from(sectorMap.entries()).map(([label, value]) => ({ label, value, share: totals.totalValue ? (value / totals.totalValue) * 100 : 0 })).sort((left, right) => right.value - left.value),
       countries: Array.from(countryMap.entries()).map(([label, value]) => ({ label, value, share: totals.totalValue ? (value / totals.totalValue) * 100 : 0 })).sort((left, right) => right.value - left.value),
@@ -2604,7 +2626,7 @@ export default function Home() {
               <article className="insight-card"><span>Takip edilen fon</span><strong>{fundAssets.length}</strong><small>Portfoydeki fon sayisi</small></article>
               <article className={fundLookthrough.coverage >= 80 ? "insight-card green" : fundLookthrough.coverage >= 40 ? "insight-card gold" : "insight-card red"}><span>Icerik kapsami</span><strong>{pct(fundLookthrough.coverage)}</strong><small>{fundLookthrough.fundsWithData} fon icin veri var</small></article>
               <article className={fundLookthrough.topOverlap ? "insight-card gold" : "insight-card green"}><span>En yuksek ortusme</span><strong>{fundLookthrough.topOverlap ? `${fundLookthrough.topOverlap.left}/${fundLookthrough.topOverlap.right}` : "-"}</strong><small>{fundLookthrough.topOverlap ? `${pct(fundLookthrough.topOverlap.overlap)} ortak agirlik` : "Ortak pozisyon yok"}</small></article>
-              <article className="insight-card"><span>En buyuk dolayli varlik</span><strong>{fundLookthrough.indirectRows[0]?.symbol || "-"}</strong><small>{fundLookthrough.indirectRows[0] ? `${money(fundLookthrough.indirectRows[0].indirectValue)} Â· ${pct(fundLookthrough.indirectRows[0].portfolioShare)}` : "Veri yok"}</small></article>
+              <article className="insight-card"><span>En buyuk dolayli varlik</span><strong>{fundLookthrough.indirectRows[0]?.symbol || "-"}</strong><small>{fundLookthrough.indirectRows[0] ? `${money(fundLookthrough.indirectRows[0].indirectValue)} - ${pct(fundLookthrough.indirectRows[0].portfolioShare)}` : "Veri yok"}</small></article>
               <article className="insight-card"><span>Icerik kaydi</span><strong>{fundLookthrough.holdingRows.length}</strong><small>Fon ici pozisyon</small></article>
             </section>
 
@@ -2657,7 +2679,7 @@ export default function Home() {
                     <div className="holding-token">{row.symbol.slice(0, 2)}</div>
                     <div>
                       <strong>{row.symbol}</strong>
-                      <small>{row.name} Â· {row.funds.join(", ")}</small>
+                      <small>{row.name} - {row.funds.join(", ")}</small>
                     </div>
                     <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(3, row.portfolioShare * 3)}%`, background: "#3f7f8f" }} /></div>
                     <span>{pct(row.portfolioShare)}</span>
@@ -2735,6 +2757,7 @@ export default function Home() {
                   const holdings = fundLookthrough.settings.fundHoldings[code] || [];
                   const sourceText = holdings[0]?.source || "Manuel veri";
                   const asOfText = holdings[0]?.asOf ? ` · ${holdings[0].asOf}` : "";
+                  const totalInfo = fundLookthrough.fundTotals[code] || { knownWeight: 0, missingWeight: 100, overWeight: 0 };
                   return (
                     <article className="fund-dataset-card" key={fundRow.asset.id}>
                       <div className="fund-dataset-head">
@@ -2742,16 +2765,29 @@ export default function Home() {
                         <div><strong>{code}</strong><small>{holdings.length} kayit · {sourceText}{asOfText} · Fon degeri {money(fundRow.value)}</small></div>
                         <button className="secondary mini-action" onClick={() => void syncFundHoldings(code)} disabled={loading} type="button">Yenile</button>
                       </div>
+                      <div className={totalInfo.overWeight > 0 ? "fund-total-strip warning" : totalInfo.missingWeight > 0.05 ? "fund-total-strip" : "fund-total-strip complete"}>
+                        <span>Kayitli agirlik {pct(totalInfo.knownWeight)}</span>
+                        <strong>{totalInfo.overWeight > 0 ? `${pct(totalInfo.overWeight)} fazla` : totalInfo.missingWeight > 0.05 ? `${pct(totalInfo.missingWeight)} diger / aciklanmayan kisim` : "Toplam %100"}</strong>
+                      </div>
                       <div className="fund-dataset-rows">
                         {holdings.length ? holdings.map((holding) => (
                           <div className="fund-dataset-row" key={holding.id}>
                             <span>{holding.symbol}</span>
                             <strong>{holding.name}</strong>
-                            <small>{holding.sector} Â· {holding.country}</small>
+                            <small>{holding.sector} - {holding.country}</small>
                             <b>{pct(holding.weight)}</b>
                             <button className="icon-btn" onClick={() => void deleteFundHolding(code, holding.id)} title="Sil" type="button">x</button>
                           </div>
                         )) : <div className="empty">Bu fon icin icerik kaydi yok.</div>}
+                        {totalInfo.missingWeight > 0.05 ? (
+                          <div className="fund-dataset-row residual">
+                            <span>DIGER</span>
+                            <strong>Diger / aciklanmayan kisim</strong>
+                            <small>Diger - Belirtilmedi</small>
+                            <b>{pct(totalInfo.missingWeight)}</b>
+                            <i />
+                          </div>
+                        ) : null}
                       </div>
                     </article>
                   );

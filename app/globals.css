@@ -1294,6 +1294,28 @@ select:focus {
   color: var(--muted);
 }
 
+.fund-total-strip {
+  border-bottom: 1px solid var(--line);
+  background: #fffaf0;
+  color: #8a6500;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.fund-total-strip.complete {
+  background: #eefaf5;
+  color: var(--green);
+}
+
+.fund-total-strip.warning {
+  background: #fff0ee;
+  color: var(--red);
+}
+
 .mini-action {
   min-height: 30px;
   padding: 0 10px;
@@ -1349,6 +1371,16 @@ select:focus {
 
 .fund-dataset-row b {
   text-align: right;
+}
+
+.fund-dataset-row.residual {
+  background: #fffaf0;
+}
+
+.fund-dataset-row.residual span,
+.fund-dataset-row.residual strong,
+.fund-dataset-row.residual b {
+  color: #8a6500;
 }
 
 .comparison-panel {

@@ -1178,12 +1178,11 @@ export default function Home() {
         fundRow,
         code,
         rows,
-        shownRows: rows.slice(0, 8),
         totalsInfo,
         source: rows[0]?.source || "Veri yok",
         asOf: rows[0]?.asOf || "",
-        sectorRows: Array.from(sectorMap.entries()).map(([label, value]) => ({ label, value })).sort((left, right) => right.value - left.value).slice(0, 5),
-        countryRows: Array.from(countryMap.entries()).map(([label, value]) => ({ label, value })).sort((left, right) => right.value - left.value).slice(0, 4),
+        sectorRows: Array.from(sectorMap.entries()).map(([label, value]) => ({ label, value })).sort((left, right) => right.value - left.value).slice(0, 6),
+        countryRows: Array.from(countryMap.entries()).map(([label, value]) => ({ label, value })).sort((left, right) => right.value - left.value).slice(0, 5),
       };
     });
   }, [fundAssets, fundLookthrough]);
@@ -3370,67 +3369,56 @@ export default function Home() {
             </section>
           </section>
 
-          <section className="report-page fund-report-page">
-            <div className="report-hero compact"><div><h1>Fon Icerikleri</h1><p>Fonlarin resmi dokumlerden gelen ana pozisyonlari, kapsami ve sinif kirilimi.</p></div></div>
-            <section className="report-panel fund-report-overview">
-              <div className="report-panel-head"><h2>Fon Icerik Ozeti</h2><p>Acilanan agirlik, kalan kisim ve fon bazinda portfoye dolayli etki.</p></div>
-              <div className="fund-report-summary-grid">
-                {reportFundCards.map((fund) => (
-                  <article key={fund.code}>
-                    <AssetLogo asset={fund.fundRow.asset} color={groupColors.fund || "#3f7f8f"} small />
-                    <strong>{fund.code}</strong>
-                    <span>{fund.rows.length} kayit</span>
-                    <b>{pct(fund.totalsInfo.knownWeight)}</b>
-                    <small>{money(fund.fundRow.value)} fon degeri</small>
-                  </article>
-                ))}
+          {reportFundCards.map((fund) => (
+            <section className={`report-page fund-report-page fund-detail-page ${fund.rows.length > 36 ? "dense" : ""}`} key={fund.code}>
+              <div className="report-hero compact">
+                <div>
+                  <h1>{fund.code} Fon Icerigi</h1>
+                  <p>{fund.source}{fund.asOf ? ` - ${fund.asOf}` : ""}</p>
+                </div>
+                <strong>{pct(fund.totalsInfo.knownWeight)}</strong>
               </div>
-            </section>
-            <div className="fund-report-grid">
-              {reportFundCards.map((fund) => (
-                <section className="report-panel fund-report-card" key={fund.code}>
-                  <div className="fund-report-card-head">
-                    <div>
-                      <h2>{fund.code}</h2>
-                      <p>{fund.source}{fund.asOf ? ` - ${fund.asOf}` : ""}</p>
-                    </div>
-                    <strong>{pct(fund.totalsInfo.knownWeight)}</strong>
+              <section className="report-panel fund-detail-panel">
+                <div className="fund-detail-kpis">
+                  <article><span>Kayit sayisi</span><strong>{fund.rows.length}</strong><small>Tum pozisyonlar</small></article>
+                  <article><span>Fon degeri</span><strong>{money(fund.fundRow.value)}</strong><small>{fund.fundRow.asset.name}</small></article>
+                  <article><span>Acilanan agirlik</span><strong>{pct(fund.totalsInfo.knownWeight)}</strong><small>{fund.totalsInfo.missingWeight > 0.05 ? `${pct(fund.totalsInfo.missingWeight)} kalan kisim` : "Tam kapsama yakin"}</small></article>
+                </div>
+                <div className="fund-detail-coverage">
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${Math.min(100, Math.max(2, fund.totalsInfo.knownWeight))}%`, background: groupColors.fund || "#3f7f8f" }} />
                   </div>
-                  <div className="fund-report-coverage">
-                    <div className="bar-track">
-                      <div className="bar-fill" style={{ width: `${Math.min(100, Math.max(2, fund.totalsInfo.knownWeight))}%`, background: groupColors.fund || "#3f7f8f" }} />
-                    </div>
-                    <span>{fund.totalsInfo.missingWeight > 0.05 ? `${pct(fund.totalsInfo.missingWeight)} diger / aciklanmayan` : "Tam kapsama yakin"}</span>
-                  </div>
-                  <div className="fund-report-holdings">
-                    {fund.shownRows.map((holding) => (
-                      <div className="fund-report-holding-row" key={holding.id}>
+                  <span>{fund.totalsInfo.missingWeight > 0.05 ? `${pct(fund.totalsInfo.missingWeight)} diger / aciklanmayan kisim` : "Acilanan pozisyonlar fona neredeyse tam yakindir"}</span>
+                </div>
+                <div className="fund-detail-layout">
+                  <div className="fund-position-list">
+                    {fund.rows.map((holding) => (
+                      <div className="fund-position-row" key={holding.id}>
                         <span>{holding.symbol}</span>
                         <strong>{holding.name}</strong>
                         <small>{holding.sector} - {holding.country}</small>
                         <b>{pct(holding.weight)}</b>
                       </div>
                     ))}
-                    {fund.rows.length > fund.shownRows.length ? <div className="fund-report-more">+{fund.rows.length - fund.shownRows.length} ek pozisyon tabloda sakli</div> : null}
                   </div>
-                  <div className="fund-report-breakdown">
+                  <aside className="fund-detail-side">
                     <div>
-                      <h3>Sektor</h3>
+                      <h3>Sektor dagilimi</h3>
                       {fund.sectorRows.map((row) => (
                         <p key={row.label}><span>{row.label}</span><b>{pct(row.value)}</b></p>
                       ))}
                     </div>
                     <div>
-                      <h3>Ulke</h3>
+                      <h3>Ulke dagilimi</h3>
                       {fund.countryRows.map((row) => (
                         <p key={row.label}><span>{row.label}</span><b>{pct(row.value)}</b></p>
                       ))}
                     </div>
-                  </div>
-                </section>
-              ))}
-            </div>
-          </section>
+                  </aside>
+                </div>
+              </section>
+            </section>
+          ))}
 
           <section className="report-page">
             <div className="report-hero compact"><div><h1>Gelecek Projeksiyonu</h1><p>Bugunku deger uzerine her yil 360.000 TL ek yatirim ve yillik %16 bilesik getiri varsayimi.</p></div></div>

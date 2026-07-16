@@ -3294,204 +3294,169 @@ label {
     page-break-before: always;
   }
 
-  .fund-report-overview {
+  .fund-detail-page .report-hero.compact {
+    align-items: flex-start;
     margin-bottom: 8px;
   }
 
-  .fund-report-summary-grid {
+  .fund-detail-page .report-hero.compact strong {
+    color: #123b52;
+    font-size: 18px;
+  }
+
+  .fund-detail-panel {
+    overflow: visible;
+  }
+
+  .fund-detail-kpis {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
-    padding: 10px 12px 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
   }
 
-  .fund-report-summary-grid article {
-    display: grid;
-    grid-template-columns: 20px 1fr auto;
-    grid-template-areas:
-      "logo code weight"
-      "logo count weight"
-      "logo value value";
-    align-items: center;
-    gap: 2px 7px;
+  .fund-detail-kpis article {
     border: 1px solid #dbe3ec;
     border-radius: 8px;
     background: #f4f6f8;
-    padding: 8px;
+    padding: 9px;
   }
 
-  .fund-report-summary-grid .asset-logo {
-    grid-area: logo;
-    width: 18px;
-    height: 18px;
+  .fund-detail-kpis span {
+    display: block;
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
 
-  .fund-report-summary-grid strong {
-    grid-area: code;
+  .fund-detail-kpis strong {
+    display: block;
+    margin-top: 4px;
     color: var(--ink);
-    font-size: 11px;
-  }
-
-  .fund-report-summary-grid span {
-    grid-area: count;
-    color: var(--muted);
-    font-size: 8px;
-    font-weight: 800;
-  }
-
-  .fund-report-summary-grid b {
-    grid-area: weight;
-    color: #123b52;
-    font-size: 13px;
-    text-align: right;
-  }
-
-  .fund-report-summary-grid small {
-    grid-area: value;
-    color: var(--muted);
-    font-size: 8px;
-    font-weight: 800;
-  }
-
-  .fund-report-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .fund-report-card {
-    margin: 0;
-  }
-
-  .fund-report-card:nth-child(3) {
-    grid-column: 1 / -1;
-  }
-
-  .fund-report-card-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px 8px;
-    border-bottom: 1px solid var(--line);
-    background: #f8fafc;
-  }
-
-  .fund-report-card-head h2 {
-    margin: 0;
-    color: var(--ink);
-    font-size: 15px;
-  }
-
-  .fund-report-card-head p {
-    margin: 3px 0 0;
-    color: var(--muted);
-    font-size: 8px;
-  }
-
-  .fund-report-card-head strong {
-    color: #123b52;
     font-size: 14px;
-    white-space: nowrap;
   }
 
-  .fund-report-coverage {
+  .fund-detail-kpis small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 8px;
+  }
+
+  .fund-detail-coverage {
     display: grid;
-    grid-template-columns: minmax(120px, 1fr) auto;
+    grid-template-columns: minmax(240px, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--line);
   }
 
-  .fund-report-coverage .bar-track {
+  .fund-detail-coverage .bar-track {
     height: 9px;
   }
 
-  .fund-report-coverage span {
+  .fund-detail-coverage span {
     color: #9a6a00;
     font-size: 8px;
     font-weight: 900;
     white-space: nowrap;
   }
 
-  .fund-report-holdings {
+  .fund-detail-layout {
     display: grid;
-    gap: 0;
+    grid-template-columns: minmax(0, 1fr) 170px;
+    gap: 10px;
+    padding: 10px 12px 12px;
   }
 
-  .fund-report-holding-row {
+  .fund-position-list {
+    column-count: 2;
+    column-gap: 10px;
+  }
+
+  .fund-position-row {
     display: grid;
-    grid-template-columns: 48px minmax(88px, 1fr) minmax(86px, 1fr) 42px;
-    gap: 6px;
+    grid-template-columns: 42px minmax(74px, 1fr) 38px;
+    grid-template-areas:
+      "symbol name weight"
+      "symbol meta weight";
+    gap: 1px 5px;
     align-items: center;
-    padding: 5px 12px;
-    border-bottom: 1px solid #e1e8f0;
-    font-size: 8px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 0 3px;
+    padding: 3px 5px;
+    border: 1px solid #e1e8f0;
+    border-radius: 4px;
+    background: #ffffff;
+    font-size: 7px;
   }
 
-  .fund-report-holding-row span {
+  .dense .fund-position-row {
+    margin-bottom: 2px;
+    padding: 2px 4px;
+    font-size: 6.2px;
+  }
+
+  .fund-position-row span {
+    grid-area: symbol;
     color: var(--ink);
     font-weight: 900;
   }
 
-  .fund-report-holding-row strong {
+  .fund-position-row strong {
+    grid-area: name;
     color: var(--ink);
     line-height: 1.2;
   }
 
-  .fund-report-holding-row small {
+  .fund-position-row small {
+    grid-area: meta;
     color: var(--muted);
     line-height: 1.2;
   }
 
-  .fund-report-holding-row b {
+  .fund-position-row b {
+    grid-area: weight;
     color: var(--ink);
     text-align: right;
   }
 
-  .fund-report-more {
-    padding: 5px 12px;
-    color: var(--muted);
-    font-size: 8px;
-    font-weight: 900;
-    border-bottom: 1px solid #e1e8f0;
-  }
-
-  .fund-report-breakdown {
+  .fund-detail-side {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0;
+    gap: 8px;
+    align-content: start;
+  }
+
+  .fund-detail-side > div {
+    border: 1px solid #dbe3ec;
+    border-radius: 8px;
     background: #f8fafc;
+    padding: 8px;
   }
 
-  .fund-report-breakdown > div {
-    padding: 8px 12px;
-    border-right: 1px solid var(--line);
-  }
-
-  .fund-report-breakdown > div:last-child {
-    border-right: 0;
-  }
-
-  .fund-report-breakdown h3 {
-    margin: 0 0 5px;
+  .fund-detail-side h3 {
+    margin: 0 0 6px;
     color: var(--muted);
     font-size: 8px;
     font-weight: 900;
     text-transform: uppercase;
   }
 
-  .fund-report-breakdown p {
+  .fund-detail-side p {
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    margin: 0 0 3px;
+    margin: 0 0 4px;
     color: var(--ink);
-    font-size: 8px;
+    font-size: 7px;
   }
 
-  .fund-report-breakdown b {
+  .fund-detail-side b {
     white-space: nowrap;
   }
 

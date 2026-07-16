@@ -1098,6 +1098,230 @@ select:focus {
   text-align: right;
 }
 
+.fund-overlap-panel,
+.fund-lookthrough-panel,
+.fund-dataset-panel,
+.exposure-panel {
+  overflow: hidden;
+}
+
+.overlap-grid {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+}
+
+.fund-overlap-table {
+  min-width: 720px;
+}
+
+.fund-note-card {
+  border: 1px solid #cfe0eb;
+  border-left: 4px solid #3f7f8f;
+  border-radius: 8px;
+  background: #f6fbfd;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.fund-note-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fund-note-card strong {
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.fund-note-card p {
+  margin: 0;
+  color: #31445c;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.lookthrough-list {
+  padding: 18px;
+  display: grid;
+  gap: 9px;
+}
+
+.lookthrough-row {
+  display: grid;
+  grid-template-columns: 28px 34px minmax(170px, 1fr) minmax(160px, 1.5fr) 70px 120px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 10px 12px;
+}
+
+.lookthrough-row .rank {
+  color: var(--muted);
+  font-weight: 900;
+  text-align: center;
+}
+
+.holding-token {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: #e8f2f5;
+  color: #3f7f8f;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.lookthrough-row strong,
+.lookthrough-row b {
+  color: var(--ink);
+}
+
+.lookthrough-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.lookthrough-row > span:not(.rank) {
+  text-align: right;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.lookthrough-row b {
+  text-align: right;
+}
+
+.fund-exposure-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.exposure-list {
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.exposure-row {
+  display: grid;
+  grid-template-columns: 130px minmax(150px, 1fr) 70px;
+  align-items: center;
+  gap: 12px;
+}
+
+.exposure-row span {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.exposure-row strong {
+  color: var(--muted);
+  text-align: right;
+}
+
+.fund-holding-form {
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 1.25fr repeat(5, minmax(120px, 1fr)) 96px;
+  gap: 10px;
+  align-items: end;
+}
+
+.fund-holding-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.fund-holding-form select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 0 10px;
+}
+
+.fund-dataset-list {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fund-dataset-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  overflow: hidden;
+}
+
+.fund-dataset-head {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f5f8fb;
+}
+
+.fund-dataset-head strong {
+  display: block;
+  color: var(--ink);
+}
+
+.fund-dataset-head small {
+  color: var(--muted);
+}
+
+.fund-dataset-rows {
+  display: grid;
+}
+
+.fund-dataset-row {
+  display: grid;
+  grid-template-columns: 70px minmax(120px, 1fr) minmax(130px, 1fr) 64px 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.fund-dataset-row:last-child {
+  border-bottom: 0;
+}
+
+.fund-dataset-row span,
+.fund-dataset-row strong,
+.fund-dataset-row b {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.fund-dataset-row small {
+  color: var(--muted);
+}
+
+.fund-dataset-row b {
+  text-align: right;
+}
+
 .comparison-panel {
   overflow: hidden;
 }
@@ -2131,8 +2355,15 @@ label {
   .return-breakdown,
   .target-settings-grid,
   .benchmark-grid,
-  .source-grid {
+  .source-grid,
+  .fund-dataset-list,
+  .fund-exposure-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overlap-grid,
+  .fund-holding-form {
+    grid-template-columns: 1fr;
   }
 
   .return-breakdown div {
@@ -2198,6 +2429,12 @@ label {
   .target-settings-grid,
   .rebalance-row,
   .asset-target-row,
+  .overlap-grid,
+  .lookthrough-row,
+  .fund-exposure-grid,
+  .fund-holding-form,
+  .fund-dataset-list,
+  .fund-dataset-row,
   .benchmark-grid,
   .source-grid,
   .transaction-form,
@@ -2226,6 +2463,13 @@ label {
   }
 
   .rebalance-row strong {
+    text-align: left;
+  }
+
+  .lookthrough-row > span:not(.rank),
+  .lookthrough-row b,
+  .exposure-row strong,
+  .fund-dataset-row b {
     text-align: left;
   }
 

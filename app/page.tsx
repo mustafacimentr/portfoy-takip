@@ -66,11 +66,22 @@ type BenchmarkPoint = {
   symbol: string;
 };
 
+type FundHolding = {
+  id: string;
+  fundCode: string;
+  symbol: string;
+  name: string;
+  weight: number;
+  sector: string;
+  country: string;
+};
+
 type PortfolioSettings = {
   autoRefresh: boolean;
   targetAllocations: Record<string, number>;
   rebalanceAmount: number;
   dismissedAlertIds: string[];
+  fundHoldings: Record<string, FundHolding[]>;
 };
 
 type PortfolioState = {
@@ -92,11 +103,42 @@ const defaultTargetAllocations: Record<string, number> = {
   Diger: 0,
 };
 
+const defaultFundHoldings: Record<string, FundHolding[]> = {
+  TMG: [
+    { id: "TMG-MSFT", fundCode: "TMG", symbol: "MSFT", name: "Microsoft", weight: 8.5, sector: "Teknoloji", country: "ABD" },
+    { id: "TMG-NVDA", fundCode: "TMG", symbol: "NVDA", name: "Nvidia", weight: 7.8, sector: "Yari iletken", country: "ABD" },
+    { id: "TMG-AAPL", fundCode: "TMG", symbol: "AAPL", name: "Apple", weight: 7.2, sector: "Teknoloji", country: "ABD" },
+    { id: "TMG-GOOGL", fundCode: "TMG", symbol: "GOOGL", name: "Alphabet", weight: 5.6, sector: "Iletisim", country: "ABD" },
+    { id: "TMG-AMZN", fundCode: "TMG", symbol: "AMZN", name: "Amazon", weight: 4.8, sector: "Tuketim", country: "ABD" },
+  ],
+  TGE: [
+    { id: "TGE-GLD", fundCode: "TGE", symbol: "ALTIN", name: "Altin ve altin fonlari", weight: 35, sector: "Emtia", country: "Kuresel" },
+    { id: "TGE-SLV", fundCode: "TGE", symbol: "GUMUS", name: "Gumus ve degerli metaller", weight: 18, sector: "Emtia", country: "Kuresel" },
+    { id: "TGE-ENERGY", fundCode: "TGE", symbol: "ENERJI", name: "Enerji emtialari", weight: 14, sector: "Emtia", country: "Kuresel" },
+    { id: "TGE-MINING", fundCode: "TGE", symbol: "MADEN", name: "Maden sirketleri", weight: 10, sector: "Maden", country: "Kuresel" },
+  ],
+  KPH: [
+    { id: "KPH-TUPRS", fundCode: "KPH", symbol: "TUPRS", name: "Tupras", weight: 8.2, sector: "Enerji", country: "Turkiye" },
+    { id: "KPH-BIMAS", fundCode: "KPH", symbol: "BIMAS", name: "Bim Birlesik Magazalar", weight: 7.6, sector: "Perakende", country: "Turkiye" },
+    { id: "KPH-FROTO", fundCode: "KPH", symbol: "FROTO", name: "Ford Otosan", weight: 6.9, sector: "Otomotiv", country: "Turkiye" },
+    { id: "KPH-AKBNK", fundCode: "KPH", symbol: "AKBNK", name: "Akbank", weight: 5.8, sector: "Banka", country: "Turkiye" },
+    { id: "KPH-ASELS", fundCode: "KPH", symbol: "ASELS", name: "Aselsan", weight: 4.7, sector: "Savunma", country: "Turkiye" },
+  ],
+  AFT: [
+    { id: "AFT-NVDA", fundCode: "AFT", symbol: "NVDA", name: "Nvidia", weight: 9.4, sector: "Yari iletken", country: "ABD" },
+    { id: "AFT-MSFT", fundCode: "AFT", symbol: "MSFT", name: "Microsoft", weight: 8.1, sector: "Teknoloji", country: "ABD" },
+    { id: "AFT-AAPL", fundCode: "AFT", symbol: "AAPL", name: "Apple", weight: 6.4, sector: "Teknoloji", country: "ABD" },
+    { id: "AFT-META", fundCode: "AFT", symbol: "META", name: "Meta Platforms", weight: 5.2, sector: "Iletisim", country: "ABD" },
+    { id: "AFT-AVGO", fundCode: "AFT", symbol: "AVGO", name: "Broadcom", weight: 4.8, sector: "Yari iletken", country: "ABD" },
+  ],
+};
+
 const defaultSettings: PortfolioSettings = {
   autoRefresh: true,
   targetAllocations: defaultTargetAllocations,
   rebalanceAmount: 50000,
   dismissedAlertIds: [],
+  fundHoldings: defaultFundHoldings,
 };
 
 const emptyState: PortfolioState = {
@@ -136,6 +178,7 @@ const menuItems = [
   { key: "performance", label: "Performans Gecmisi", description: "Portfoy degerinin zaman icindeki degisimi ve nakit akisi." },
   { key: "targets", label: "Hedef Portfoy", description: "Hedef oranlar, sapmalar ve yeni yatirim dagitim onerisi." },
   { key: "comparison", label: "Karsilastirma", description: "Portfoy getirini BIST, altin, doviz, Bitcoin ve global endekslerle karsilastir." },
+  { key: "fundOverlap", label: "Fon Icerik & Ortusme", description: "Fonlarin ic varliklarini, ortak pozisyonlarini ve dolayli maruziyeti analiz et." },
   { key: "dataStatus", label: "Veri Durumu", description: "Fiyat kaynaklari, son guncelleme ve hata sagligi." },
   { key: "alerts", label: "Uyarilar", description: "Hedef sapmalari, fiyat veri sorunlari ve risk sinyalleri." },
   { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
@@ -384,6 +427,32 @@ function normalizeBenchmarkPoint(point: Partial<BenchmarkPoint>): BenchmarkPoint
   };
 }
 
+function normalizeFundHolding(fundCode: string, holding: Partial<FundHolding>): FundHolding {
+  const normalizedFundCode = compactCode(holding.fundCode || fundCode);
+  const symbol = compactCode(holding.symbol || "");
+  return {
+    id: holding.id || `${normalizedFundCode}-${symbol || uid()}`,
+    fundCode: normalizedFundCode,
+    symbol,
+    name: String(holding.name || symbol || "Isimsiz varlik"),
+    weight: Math.max(0, Math.min(100, Number(holding.weight || 0))),
+    sector: String(holding.sector || "Belirtilmedi"),
+    country: String(holding.country || "Belirtilmedi"),
+  };
+}
+
+function normalizeFundHoldings(holdings?: Record<string, Partial<FundHolding>[]>) {
+  const merged: Record<string, Partial<FundHolding>[]> = { ...defaultFundHoldings, ...(holdings || {}) };
+  return Object.fromEntries(
+    Object.entries(merged).map(([fundCode, rows]) => [
+      compactCode(fundCode),
+      Array.isArray(rows)
+        ? rows.map((row) => normalizeFundHolding(fundCode, row)).filter((row) => row.symbol && row.weight > 0)
+        : [],
+    ]),
+  );
+}
+
 function normalizeTransaction(tx: Partial<Transaction>): Transaction {
   return {
     id: tx.id || uid(),
@@ -403,6 +472,7 @@ function normalizeSettings(settings?: Partial<PortfolioSettings> & { autoRefresh
     autoRefresh: settings?.autoRefresh !== false,
     rebalanceAmount: Number(settings?.rebalanceAmount || defaultSettings.rebalanceAmount),
     dismissedAlertIds: Array.isArray(settings?.dismissedAlertIds) ? settings.dismissedAlertIds.map(String) : [],
+    fundHoldings: normalizeFundHoldings(settings?.fundHoldings),
     targetAllocations: Object.fromEntries(
       groupDefinitions.map((group) => [
         group.key,
@@ -551,6 +621,7 @@ export default function Home() {
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
   const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
+  const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
   const [lastSync, setLastSync] = useState("");
 
   useEffect(() => {
@@ -880,6 +951,99 @@ export default function Home() {
   const dailyLosers = useMemo(() => {
     return portfolioRows.filter((row) => row.hasDailyChange && row.dailyChange < 0).sort((left, right) => left.dailyChange - right.dailyChange).slice(0, 3);
   }, [portfolioRows]);
+
+  const fundAssets = useMemo(() => {
+    return portfolioRows
+      .filter((row) => assetGroupKey(row.asset) === "fund")
+      .sort((left, right) => right.value - left.value);
+  }, [portfolioRows]);
+
+  const fundLookthrough = useMemo(() => {
+    const settings = normalizeSettings(state.settings);
+    const holdingRows = fundAssets.flatMap((fundRow) => {
+      const fundCode = compactCode(fundRow.asset.ticker || fundRow.asset.priceSymbol);
+      const holdings = settings.fundHoldings[fundCode] || [];
+      return holdings.map((holding) => {
+        const indirectValue = (fundRow.value * holding.weight) / 100;
+        return {
+          ...holding,
+          fundAsset: fundRow.asset,
+          fundValue: fundRow.value,
+          indirectValue,
+          portfolioShare: totals.totalValue ? (indirectValue / totals.totalValue) * 100 : 0,
+        };
+      });
+    });
+
+    const bySymbol = new Map<string, {
+      symbol: string;
+      name: string;
+      sector: string;
+      country: string;
+      indirectValue: number;
+      portfolioShare: number;
+      funds: string[];
+    }>();
+    holdingRows.forEach((row) => {
+      const current = bySymbol.get(row.symbol) || {
+        symbol: row.symbol,
+        name: row.name,
+        sector: row.sector,
+        country: row.country,
+        indirectValue: 0,
+        portfolioShare: 0,
+        funds: [],
+      };
+      current.indirectValue += row.indirectValue;
+      current.portfolioShare += row.portfolioShare;
+      if (!current.funds.includes(row.fundCode)) current.funds.push(row.fundCode);
+      bySymbol.set(row.symbol, current);
+    });
+
+    const sectorMap = new Map<string, number>();
+    const countryMap = new Map<string, number>();
+    holdingRows.forEach((row) => {
+      sectorMap.set(row.sector, (sectorMap.get(row.sector) || 0) + row.indirectValue);
+      countryMap.set(row.country, (countryMap.get(row.country) || 0) + row.indirectValue);
+    });
+
+    const pairs: Array<{ left: string; right: string; overlap: number; commonCount: number; commonSymbols: string[] }> = [];
+    fundAssets.forEach((leftFund, leftIndex) => {
+      const leftCode = compactCode(leftFund.asset.ticker || leftFund.asset.priceSymbol);
+      const leftHoldings = settings.fundHoldings[leftCode] || [];
+      const leftMap = new Map(leftHoldings.map((holding) => [holding.symbol, holding.weight]));
+      fundAssets.slice(leftIndex + 1).forEach((rightFund) => {
+        const rightCode = compactCode(rightFund.asset.ticker || rightFund.asset.priceSymbol);
+        const rightHoldings = settings.fundHoldings[rightCode] || [];
+        let overlap = 0;
+        const commonSymbols: string[] = [];
+        rightHoldings.forEach((holding) => {
+          const leftWeight = leftMap.get(holding.symbol);
+          if (leftWeight !== undefined) {
+            overlap += Math.min(leftWeight, holding.weight);
+            commonSymbols.push(holding.symbol);
+          }
+        });
+        if (commonSymbols.length) pairs.push({ left: leftCode, right: rightCode, overlap, commonCount: commonSymbols.length, commonSymbols });
+      });
+    });
+
+    const fundsWithData = fundAssets.filter((row) => (settings.fundHoldings[compactCode(row.asset.ticker || row.asset.priceSymbol)] || []).length > 0).length;
+    const topOverlap = pairs.sort((left, right) => right.overlap - left.overlap)[0];
+    const indirectRows = Array.from(bySymbol.values()).sort((left, right) => right.indirectValue - left.indirectValue);
+
+    return {
+      settings,
+      holdingRows,
+      indirectRows,
+      pairs,
+      topOverlap,
+      fundsWithData,
+      coverage: fundAssets.length ? (fundsWithData / fundAssets.length) * 100 : 0,
+      sectors: Array.from(sectorMap.entries()).map(([label, value]) => ({ label, value, share: totals.totalValue ? (value / totals.totalValue) * 100 : 0 })).sort((left, right) => right.value - left.value),
+      countries: Array.from(countryMap.entries()).map(([label, value]) => ({ label, value, share: totals.totalValue ? (value / totals.totalValue) * 100 : 0 })).sort((left, right) => right.value - left.value),
+    };
+  }, [fundAssets, state.settings, totals.totalValue]);
 
   const selectedAssetDetail = useMemo(() => {
     const asset = state.assets.find((item) => item.id === selectedAssetId);
@@ -1781,6 +1945,41 @@ export default function Home() {
     }, { snapshot: false });
   }
 
+  async function saveFundHolding(event: FormEvent) {
+    event.preventDefault();
+    const fundCode = compactCode(fundHoldingDraft.fundCode || fundAssets[0]?.asset.ticker || "");
+    const symbol = compactCode(fundHoldingDraft.symbol);
+    const weight = parseAmount(fundHoldingDraft.weight);
+    if (!fundCode || !symbol || weight <= 0) return;
+    const settings = normalizeSettings(state.settings);
+    const row = normalizeFundHolding(fundCode, {
+      id: `${fundCode}-${symbol}-${Date.now()}`,
+      fundCode,
+      symbol,
+      name: fundHoldingDraft.name || symbol,
+      weight,
+      sector: fundHoldingDraft.sector || "Belirtilmedi",
+      country: fundHoldingDraft.country || "Belirtilmedi",
+    });
+    const nextRows = [...(settings.fundHoldings[fundCode] || []).filter((item) => item.symbol !== symbol), row]
+      .sort((left, right) => right.weight - left.weight);
+    await savePortfolio({
+      ...state,
+      settings: { ...settings, fundHoldings: { ...settings.fundHoldings, [fundCode]: nextRows } },
+    }, { snapshot: false });
+    setFundHoldingDraft({ fundCode, symbol: "", name: "", weight: "", sector: "", country: "" });
+  }
+
+  async function deleteFundHolding(fundCode: string, id: string) {
+    const settings = normalizeSettings(state.settings);
+    const code = compactCode(fundCode);
+    const nextRows = (settings.fundHoldings[code] || []).filter((row) => row.id !== id);
+    await savePortfolio({
+      ...state,
+      settings: { ...settings, fundHoldings: { ...settings.fundHoldings, [code]: nextRows } },
+    }, { snapshot: false });
+  }
+
   function chartPoints(key: "totalValue" | "totalCost") {
     if (historySeries.length === 1) {
       const y = chartY(historySeries[0][key]);
@@ -2355,6 +2554,162 @@ export default function Home() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "fundOverlap" ? (
+          <>
+            <section className="insights-grid fund-kpis">
+              <article className="insight-card"><span>Takip edilen fon</span><strong>{fundAssets.length}</strong><small>Portfoydeki fon sayisi</small></article>
+              <article className={fundLookthrough.coverage >= 80 ? "insight-card green" : fundLookthrough.coverage >= 40 ? "insight-card gold" : "insight-card red"}><span>Icerik kapsami</span><strong>{pct(fundLookthrough.coverage)}</strong><small>{fundLookthrough.fundsWithData} fon icin veri var</small></article>
+              <article className={fundLookthrough.topOverlap ? "insight-card gold" : "insight-card green"}><span>En yuksek ortusme</span><strong>{fundLookthrough.topOverlap ? `${fundLookthrough.topOverlap.left}/${fundLookthrough.topOverlap.right}` : "-"}</strong><small>{fundLookthrough.topOverlap ? `${pct(fundLookthrough.topOverlap.overlap)} ortak agirlik` : "Ortak pozisyon yok"}</small></article>
+              <article className="insight-card"><span>En buyuk dolayli varlik</span><strong>{fundLookthrough.indirectRows[0]?.symbol || "-"}</strong><small>{fundLookthrough.indirectRows[0] ? `${money(fundLookthrough.indirectRows[0].indirectValue)} Â· ${pct(fundLookthrough.indirectRows[0].portfolioShare)}` : "Veri yok"}</small></article>
+              <article className="insight-card"><span>Icerik kaydi</span><strong>{fundLookthrough.holdingRows.length}</strong><small>Fon ici pozisyon</small></article>
+            </section>
+
+            <section className="panel fund-overlap-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Fonlar Arasi Ortusme</h2>
+                  <p>Ayni alt varliklari tasiyan fonlari yakalar; oranlar fon ici agirliklarin kesisimini gosterir.</p>
+                </div>
+              </div>
+              <div className="overlap-grid">
+                <div className="table-scroll">
+                  <table className="fund-overlap-table">
+                    <thead>
+                      <tr><th>Fon cifti</th><th>Ortak varlik</th><th>Ortusme</th><th>Ortak kodlar</th></tr>
+                    </thead>
+                    <tbody>
+                      {fundLookthrough.pairs.length ? fundLookthrough.pairs.map((pair) => (
+                        <tr key={`${pair.left}-${pair.right}`}>
+                          <td><strong>{pair.left} / {pair.right}</strong></td>
+                          <td>{pair.commonCount}</td>
+                          <td><span className={pair.overlap >= 15 ? "target-status over" : pair.overlap >= 7 ? "target-status missing" : "target-status balanced"}>{pct(pair.overlap)}</span></td>
+                          <td>{pair.commonSymbols.slice(0, 6).join(", ")}</td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={4}><div className="empty">Kayitli fon iceriklerinde henuz ortak varlik bulunmuyor.</div></td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="fund-note-card">
+                  <span>Okuma notu</span>
+                  <strong>Bu ekran kayitli fon icerik veri setiyle hesaplanir.</strong>
+                  <p>Fon sirketleri portfoy dagilimini belirli araliklarla aciklar. Veri setini guncelledikce dolayli maruziyet, sektor ve ulke dagilimi de otomatik yenilenir.</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="panel visual-panel fund-lookthrough-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Dolayli Varlik Maruziyeti</h2>
+                  <p>Fonlar uzerinden portfoye dolayli olarak giren en buyuk sirket, tema ve emtia pozisyonlari.</p>
+                </div>
+              </div>
+              <div className="lookthrough-list">
+                {fundLookthrough.indirectRows.length ? fundLookthrough.indirectRows.slice(0, 10).map((row, index) => (
+                  <div className="lookthrough-row" key={row.symbol}>
+                    <span className="rank">{index + 1}</span>
+                    <div className="holding-token">{row.symbol.slice(0, 2)}</div>
+                    <div>
+                      <strong>{row.symbol}</strong>
+                      <small>{row.name} Â· {row.funds.join(", ")}</small>
+                    </div>
+                    <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(3, row.portfolioShare * 3)}%`, background: "#3f7f8f" }} /></div>
+                    <span>{pct(row.portfolioShare)}</span>
+                    <b>{money(row.indirectValue)}</b>
+                  </div>
+                )) : <div className="empty">Fon icerigi eklendiginde dolayli varliklar burada gorunecek.</div>}
+              </div>
+            </section>
+
+            <section className="fund-exposure-grid">
+              <div className="panel exposure-panel">
+                <div className="panel-header compact"><div><h2>Sektor Maruziyeti</h2><p>Fon iceriklerinden gelen dolayli sektor agirligi.</p></div></div>
+                <div className="exposure-list">
+                  {fundLookthrough.sectors.slice(0, 8).map((row) => (
+                    <div className="exposure-row" key={row.label}>
+                      <span>{row.label}</span>
+                      <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(3, row.share * 3)}%`, background: "#193a6a" }} /></div>
+                      <strong>{pct(row.share)}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="panel exposure-panel">
+                <div className="panel-header compact"><div><h2>Ulke / Tema Maruziyeti</h2><p>Fonlarin ulke veya bolge kesisimleri.</p></div></div>
+                <div className="exposure-list">
+                  {fundLookthrough.countries.slice(0, 8).map((row) => (
+                    <div className="exposure-row" key={row.label}>
+                      <span>{row.label}</span>
+                      <div className="bar-track"><div className="bar-fill accent" style={{ width: `${Math.max(3, row.share * 3)}%` }} /></div>
+                      <strong>{pct(row.share)}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="panel fund-dataset-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Fon Icerik Veri Seti</h2>
+                  <p>Yeni fon veya alt varlik ekle; ayni sembol tekrar eklenirse ilgili kayit guncellenir.</p>
+                </div>
+              </div>
+              <form className="fund-holding-form" onSubmit={(event) => void saveFundHolding(event)}>
+                <label>Fon
+                  <select value={fundHoldingDraft.fundCode || fundAssets[0]?.asset.ticker || ""} onChange={(event) => setFundHoldingDraft({ ...fundHoldingDraft, fundCode: event.target.value })}>
+                    {fundAssets.map((row) => <option key={row.asset.id} value={compactCode(row.asset.ticker)}>{compactCode(row.asset.ticker)} - {row.asset.name}</option>)}
+                    {!fundAssets.length ? <option value="">Fon yok</option> : null}
+                  </select>
+                </label>
+                <label>Sembol
+                  <input className="input" value={fundHoldingDraft.symbol} onChange={(event) => setFundHoldingDraft({ ...fundHoldingDraft, symbol: event.target.value })} placeholder="MSFT" />
+                </label>
+                <label>Ad
+                  <input className="input" value={fundHoldingDraft.name} onChange={(event) => setFundHoldingDraft({ ...fundHoldingDraft, name: event.target.value })} placeholder="Microsoft" />
+                </label>
+                <label>Fon ici agirlik (%)
+                  <input className="input" value={fundHoldingDraft.weight} onChange={(event) => setFundHoldingDraft({ ...fundHoldingDraft, weight: event.target.value })} placeholder="8,5" />
+                </label>
+                <label>Sektor
+                  <input className="input" value={fundHoldingDraft.sector} onChange={(event) => setFundHoldingDraft({ ...fundHoldingDraft, sector: event.target.value })} placeholder="Teknoloji" />
+                </label>
+                <label>Ulke / Tema
+                  <input className="input" value={fundHoldingDraft.country} onChange={(event) => setFundHoldingDraft({ ...fundHoldingDraft, country: event.target.value })} placeholder="ABD" />
+                </label>
+                <button className="primary" disabled={!fundAssets.length}>Kaydet</button>
+              </form>
+              <div className="fund-dataset-list">
+                {fundAssets.map((fundRow) => {
+                  const code = compactCode(fundRow.asset.ticker || fundRow.asset.priceSymbol);
+                  const holdings = fundLookthrough.settings.fundHoldings[code] || [];
+                  return (
+                    <article className="fund-dataset-card" key={fundRow.asset.id}>
+                      <div className="fund-dataset-head">
+                        <AssetLogo asset={fundRow.asset} color={groupColors.fund} />
+                        <div><strong>{code}</strong><small>{holdings.length} kayit Â· Fon degeri {money(fundRow.value)}</small></div>
+                      </div>
+                      <div className="fund-dataset-rows">
+                        {holdings.length ? holdings.map((holding) => (
+                          <div className="fund-dataset-row" key={holding.id}>
+                            <span>{holding.symbol}</span>
+                            <strong>{holding.name}</strong>
+                            <small>{holding.sector} Â· {holding.country}</small>
+                            <b>{pct(holding.weight)}</b>
+                            <button className="icon-btn" onClick={() => void deleteFundHolding(code, holding.id)} title="Sil" type="button">x</button>
+                          </div>
+                        )) : <div className="empty">Bu fon icin icerik kaydi yok.</div>}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           </>

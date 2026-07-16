@@ -3289,6 +3289,212 @@ label {
     page-break-before: avoid;
   }
 
+  .print-report .fund-report-page {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .fund-report-overview {
+    margin-bottom: 8px;
+  }
+
+  .fund-report-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 12px 12px;
+  }
+
+  .fund-report-summary-grid article {
+    display: grid;
+    grid-template-columns: 20px 1fr auto;
+    grid-template-areas:
+      "logo code weight"
+      "logo count weight"
+      "logo value value";
+    align-items: center;
+    gap: 2px 7px;
+    border: 1px solid #dbe3ec;
+    border-radius: 8px;
+    background: #f4f6f8;
+    padding: 8px;
+  }
+
+  .fund-report-summary-grid .asset-logo {
+    grid-area: logo;
+    width: 18px;
+    height: 18px;
+  }
+
+  .fund-report-summary-grid strong {
+    grid-area: code;
+    color: var(--ink);
+    font-size: 11px;
+  }
+
+  .fund-report-summary-grid span {
+    grid-area: count;
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 800;
+  }
+
+  .fund-report-summary-grid b {
+    grid-area: weight;
+    color: #123b52;
+    font-size: 13px;
+    text-align: right;
+  }
+
+  .fund-report-summary-grid small {
+    grid-area: value;
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 800;
+  }
+
+  .fund-report-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .fund-report-card {
+    margin: 0;
+  }
+
+  .fund-report-card:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .fund-report-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--line);
+    background: #f8fafc;
+  }
+
+  .fund-report-card-head h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 15px;
+  }
+
+  .fund-report-card-head p {
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: 8px;
+  }
+
+  .fund-report-card-head strong {
+    color: #123b52;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .fund-report-coverage {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .fund-report-coverage .bar-track {
+    height: 9px;
+  }
+
+  .fund-report-coverage span {
+    color: #9a6a00;
+    font-size: 8px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .fund-report-holdings {
+    display: grid;
+    gap: 0;
+  }
+
+  .fund-report-holding-row {
+    display: grid;
+    grid-template-columns: 48px minmax(88px, 1fr) minmax(86px, 1fr) 42px;
+    gap: 6px;
+    align-items: center;
+    padding: 5px 12px;
+    border-bottom: 1px solid #e1e8f0;
+    font-size: 8px;
+  }
+
+  .fund-report-holding-row span {
+    color: var(--ink);
+    font-weight: 900;
+  }
+
+  .fund-report-holding-row strong {
+    color: var(--ink);
+    line-height: 1.2;
+  }
+
+  .fund-report-holding-row small {
+    color: var(--muted);
+    line-height: 1.2;
+  }
+
+  .fund-report-holding-row b {
+    color: var(--ink);
+    text-align: right;
+  }
+
+  .fund-report-more {
+    padding: 5px 12px;
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 900;
+    border-bottom: 1px solid #e1e8f0;
+  }
+
+  .fund-report-breakdown {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    background: #f8fafc;
+  }
+
+  .fund-report-breakdown > div {
+    padding: 8px 12px;
+    border-right: 1px solid var(--line);
+  }
+
+  .fund-report-breakdown > div:last-child {
+    border-right: 0;
+  }
+
+  .fund-report-breakdown h3 {
+    margin: 0 0 5px;
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .fund-report-breakdown p {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 3px;
+    color: var(--ink);
+    font-size: 8px;
+  }
+
+  .fund-report-breakdown b {
+    white-space: nowrap;
+  }
+
   .print-report .projection-list {
     padding: 12px;
   }

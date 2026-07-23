@@ -3217,6 +3217,11 @@ label {
     page-break-before: always;
   }
 
+  .print-report .transaction-report-page {
+    break-before: page;
+    page-break-before: always;
+  }
+
   .print-report .assets-page .report-hero,
   .print-report .report-page > .report-hero {
     margin-top: 0;
@@ -3309,6 +3314,80 @@ label {
   .report-group-row + tr {
     break-before: avoid;
     page-break-before: avoid;
+  }
+
+  .transaction-report-panel {
+    overflow: visible;
+  }
+
+  .transaction-report-table {
+    font-size: 8px;
+  }
+
+  .transaction-report-table th,
+  .transaction-report-table td {
+    padding: 6px 6px;
+    vertical-align: middle;
+  }
+
+  .transaction-report-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .transaction-report-table th:nth-child(2),
+  .transaction-report-table td:nth-child(2) {
+    text-align: left;
+    min-width: 130px;
+  }
+
+  .transaction-report-type {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 58px;
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: #edf4f8;
+    color: #123b52;
+    font-weight: 900;
+  }
+
+  .transaction-report-type.sell {
+    background: #fff2e8;
+    color: #bd5b16;
+  }
+
+  .transaction-report-type.dividend,
+  .transaction-report-type.distribution {
+    background: #e8f7f1;
+    color: var(--green);
+  }
+
+  .transaction-report-type.fee,
+  .transaction-report-type.tax {
+    background: #fde8e5;
+    color: var(--red);
+  }
+
+  .transaction-result {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    font-weight: 900;
+    min-width: 70px;
+  }
+
+  .transaction-result .trend-triangle {
+    transform: scale(0.72);
+    transform-origin: center;
+  }
+
+  .report-empty-state {
+    padding: 24px;
+    color: var(--muted);
+    font-weight: 800;
+    text-align: center;
   }
 
   .print-report .fund-report-page {

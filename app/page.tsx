@@ -1723,6 +1723,44 @@ export default function Home() {
     { title: "Gunun en cok kazandiran", rows: dailyGainers, metric: "dailyChange", tone: "positive" },
     { title: "Gunun en cok kaybettiren", rows: dailyLosers, metric: "dailyChange", tone: "negative" },
   ] as const;
+  const reportTransactionRows = useMemo(() => {
+    const assetsById = new Map(state.assets.map((asset) => [asset.id, asset]));
+    return state.transactions
+      .map(normalizeTransaction)
+      .filter((tx) => ["sell", "dividend", "distribution", "fee", "tax"].includes(tx.type))
+      .map((tx) => {
+        const asset = assetsById.get(tx.assetId);
+        const amount = tx.amount || tx.quantity * tx.price || tx.price;
+        const realized = tx.type === "sell"
+          ? Number(tx.realizedProfit || 0)
+          : tx.type === "dividend" || tx.type === "distribution"
+            ? amount
+            : -Math.abs(amount + (tx.fee || 0));
+        const rateBase = tx.type === "sell" ? Number(tx.costBasis || 0) : 0;
+        const rate = rateBase ? (realized / rateBase) * 100 : 0;
+        const typeLabel = tx.type === "sell"
+          ? "Satis"
+          : tx.type === "dividend"
+            ? "Temettu"
+            : tx.type === "distribution"
+              ? "Fon dagitimi"
+              : tx.type === "fee"
+                ? "Komisyon"
+                : "Vergi";
+        return {
+          tx,
+          asset,
+          typeLabel,
+          amount,
+          realized,
+          rate,
+          remaining: tx.resultingQuantity,
+          status: realized >= 0 ? "positive" : "negative",
+        };
+      })
+      .sort((left, right) => right.tx.date.localeCompare(left.tx.date))
+      .slice(0, 28);
+  }, [state.assets, state.transactions]);
 
   async function login(code = draftPasscode) {
     setAuthError("");
@@ -3773,6 +3811,59 @@ export default function Home() {
                   })}
                 </tbody>
               </table>
+            </section>
+          </section>
+
+          <section className="report-page transaction-report-page">
+            <div className="report-hero compact"><div><h1>Islem Gecmisi</h1><p>Satis, temettu, fon dagitimi, komisyon ve vergi hareketlerinin rapor ozeti.</p></div></div>
+            <section className="report-panel transaction-report-panel">
+              <div className="report-panel-head"><h2>Gerceklesen Islemler</h2><p>Satislarda sonuc satilan bolumun maliyetine gore hesaplanir; kalan adet pozisyonun son durumunu gosterir.</p></div>
+              {reportTransactionRows.length ? (
+                <table className="report-table transaction-report-table">
+                  <thead>
+                    <tr>
+                      <th>Tarih</th>
+                      <th>Varlik</th>
+                      <th>Islem</th>
+                      <th>Satis adet</th>
+                      <th>Tutar</th>
+                      <th>Kalan</th>
+                      <th>Gerceklesen K/Z</th>
+                      <th>K/Z %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportTransactionRows.map((row) => (
+                      <tr key={row.tx.id}>
+                        <td>{row.tx.date}</td>
+                        <td>
+                          <span className="report-asset-cell">
+                            {row.asset ? <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small /> : null}
+                            <span><strong>{row.asset?.ticker || "-"}</strong><small>{row.asset?.name || row.tx.note || "-"}</small></span>
+                          </span>
+                        </td>
+                        <td><span className={`transaction-report-type ${row.tx.type}`}>{row.typeLabel}</span></td>
+                        <td>{row.tx.type === "sell" ? num(row.tx.quantity) : "-"}</td>
+                        <td>{money(row.amount)}</td>
+                        <td>{row.tx.type === "sell" ? num(row.remaining) : "-"}</td>
+                        <td className={row.status}>
+                          <span className="transaction-result">
+                            <i className={`trend-triangle ${row.realized >= 0 ? "up" : "down"}`} />
+                            {absoluteMoney(row.realized)}
+                          </span>
+                        </td>
+                        <td>
+                          {row.tx.type === "sell" ? (
+                            <span className={`performance-badge ${row.realized >= 0 ? "positive" : "negative"}`}>{signedPct(row.rate)}</span>
+                          ) : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="report-empty-state">Henuz rapora yansiyacak satis, gelir veya gider islemi yok.</div>
+              )}
             </section>
           </section>
 

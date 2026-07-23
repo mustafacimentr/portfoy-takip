@@ -3357,6 +3357,11 @@ label {
     color: #bd5b16;
   }
 
+  .transaction-report-type.buy {
+    background: #edf4ff;
+    color: #193a6a;
+  }
+
   .transaction-report-type.dividend,
   .transaction-report-type.distribution {
     background: #e8f7f1;
@@ -3381,6 +3386,10 @@ label {
   .transaction-result .trend-triangle {
     transform: scale(0.72);
     transform-origin: center;
+  }
+
+  .transaction-result.neutral {
+    color: var(--ink);
   }
 
   .report-empty-state {

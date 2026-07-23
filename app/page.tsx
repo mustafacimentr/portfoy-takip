@@ -1728,7 +1728,7 @@ export default function Home() {
     const assetsById = new Map(state.assets.map((asset) => [asset.id, asset]));
     return state.transactions
       .map(normalizeTransaction)
-      .filter((tx) => ["sell", "dividend", "distribution", "fee", "tax"].includes(tx.type))
+      .filter((tx) => ["buy", "sell", "dividend", "distribution", "fee", "tax"].includes(tx.type))
       .map((tx) => {
         const asset = assetsById.get(tx.assetId);
         const amount = tx.amount || tx.quantity * tx.price || tx.price;
@@ -1744,15 +1744,7 @@ export default function Home() {
             : -Math.abs(amount + (tx.fee || 0));
         const rateBase = tx.type === "sell" ? saleCostBasis : 0;
         const rate = rateBase ? (realized / rateBase) * 100 : 0;
-        const typeLabel = tx.type === "sell"
-          ? "Satis"
-          : tx.type === "dividend"
-            ? "Temettu"
-            : tx.type === "distribution"
-              ? "Fon dagitimi"
-              : tx.type === "fee"
-                ? "Komisyon"
-                : "Vergi";
+        const typeLabel = tx.type === "buy" ? "Alis" : tx.type === "sell" ? "Satis" : tx.type === "dividend" ? "Temettu" : tx.type === "distribution" ? "Fon dagitimi" : tx.type === "fee" ? "Komisyon" : "Vergi";
         return {
           tx,
           asset,
@@ -1760,7 +1752,8 @@ export default function Home() {
           amount,
           realized,
           rate,
-          remaining: tx.type === "sell" ? (tx.resultingQuantity || asset?.quantity || 0) : 0,
+          remaining: isPositionTransaction(tx.type) ? (tx.resultingQuantity || asset?.quantity || 0) : 0,
+          avgCostAfter: isPositionTransaction(tx.type) ? (tx.resultingAvgCost || asset?.avgCost || 0) : 0,
           status: realized >= 0 ? "positive" : "negative",
         };
       })
@@ -3821,9 +3814,9 @@ export default function Home() {
           </section>
 
           <section className="report-page transaction-report-page">
-            <div className="report-hero compact"><div><h1>Islem Gecmisi</h1><p>Satis, temettu, fon dagitimi, komisyon ve vergi hareketlerinin rapor ozeti.</p></div></div>
+            <div className="report-hero compact"><div><h1>Islem Gecmisi</h1><p>Alis, satis, temettu, fon dagitimi, komisyon ve vergi hareketlerinin rapor ozeti.</p></div></div>
             <section className="report-panel transaction-report-panel">
-              <div className="report-panel-head"><h2>Gerceklesen Islemler</h2><p>Satislarda sonuc satilan bolumun maliyetine gore hesaplanir; kalan adet pozisyonun son durumunu gosterir.</p></div>
+              <div className="report-panel-head"><h2>Alim Satim ve Gelir Hareketleri</h2><p>Alislarda yeni ortalama maliyet, satislarda ise gerceklesen sonuc ve kalan adet izlenir.</p></div>
               {reportTransactionRows.length ? (
                 <table className="report-table transaction-report-table">
                   <thead>
@@ -3831,10 +3824,10 @@ export default function Home() {
                       <th>Tarih</th>
                       <th>Varlik</th>
                       <th>Islem</th>
-                      <th>Satis adet</th>
+                      <th>Adet</th>
                       <th>Tutar</th>
                       <th>Kalan</th>
-                      <th>Gerceklesen K/Z</th>
+                      <th>Sonuc / Ort. maliyet</th>
                       <th>K/Z %</th>
                     </tr>
                   </thead>
@@ -3849,14 +3842,18 @@ export default function Home() {
                           </span>
                         </td>
                         <td><span className={`transaction-report-type ${row.tx.type}`}>{row.typeLabel}</span></td>
-                        <td>{row.tx.type === "sell" ? num(row.tx.quantity) : "-"}</td>
+                        <td>{isPositionTransaction(row.tx.type) ? num(row.tx.quantity) : "-"}</td>
                         <td>{money(row.amount)}</td>
-                        <td>{row.tx.type === "sell" ? num(row.remaining) : "-"}</td>
-                        <td className={row.status}>
-                          <span className="transaction-result">
-                            <i className={`trend-triangle ${row.realized >= 0 ? "up" : "down"}`} />
-                            {absoluteMoney(row.realized)}
-                          </span>
+                        <td>{isPositionTransaction(row.tx.type) ? num(row.remaining) : "-"}</td>
+                        <td className={row.tx.type === "buy" ? "" : row.status}>
+                          {row.tx.type === "buy" ? (
+                            <span className="transaction-result neutral">{money(row.avgCostAfter)}</span>
+                          ) : (
+                            <span className="transaction-result">
+                              <i className={`trend-triangle ${row.realized >= 0 ? "up" : "down"}`} />
+                              {absoluteMoney(row.realized)}
+                            </span>
+                          )}
                         </td>
                         <td>
                           {row.tx.type === "sell" ? (

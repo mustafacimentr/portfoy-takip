@@ -814,7 +814,7 @@ export default function Home() {
   const [hoveredHistoryIndex, setHoveredHistoryIndex] = useState<number | null>(null);
   const [assetDraft, setAssetDraft] = useState<Asset | null>(null);
   const [assetLookup, setAssetLookup] = useState<{ loading: boolean; message: string; ok: boolean }>({ loading: false, message: "", ok: false });
-  const [assetDraftInputs, setAssetDraftInputs] = useState({ quantity: "", avgCost: "", target: "" });
+  const [assetDraftInputs, setAssetDraftInputs] = useState({ quantity: "", avgCost: "", fee: "", feeQuantity: "", target: "" });
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
@@ -1768,10 +1768,17 @@ export default function Home() {
   async function submitAsset(event: FormEvent) {
     event.preventDefault();
     if (!assetDraft) return;
+    const grossQuantity = parseAmount(assetDraftInputs.quantity);
+    const priceCost = parseAmount(assetDraftInputs.avgCost);
+    const cashFee = parseAmount(assetDraftInputs.fee);
+    const quantityFee = parseAmount(assetDraftInputs.feeQuantity);
+    const netQuantity = Math.max(0, grossQuantity - quantityFee);
+    const totalCost = grossQuantity * priceCost + cashFee;
+    const adjustedAvgCost = netQuantity ? totalCost / netQuantity : priceCost;
     const numericDraft = normalizeAsset({
       ...assetDraft,
-      quantity: parseAmount(assetDraftInputs.quantity),
-      avgCost: parseAmount(assetDraftInputs.avgCost),
+      quantity: netQuantity,
+      avgCost: adjustedAvgCost,
       target: parseAmount(assetDraftInputs.target),
     });
     let asset = await discoverDraftAsset(numericDraft, false);
@@ -1967,6 +1974,8 @@ export default function Home() {
     setAssetDraftInputs({
       quantity: amountFieldValue(nextAsset.quantity),
       avgCost: amountFieldValue(nextAsset.avgCost),
+      fee: "",
+      feeQuantity: "",
       target: amountFieldValue(nextAsset.target),
     });
   }
@@ -3732,6 +3741,18 @@ export default function Home() {
                   setAssetDraft({ ...assetDraft, avgCost: amount, price: assetDraft.price || amount });
                 }} required />
               </label>
+              <label>Komisyon (TL)
+                <input className="input" inputMode="decimal" value={assetDraftInputs.fee} onChange={(event) => {
+                  const value = event.target.value;
+                  setAssetDraftInputs((draft) => ({ ...draft, fee: value }));
+                }} placeholder="Istege bagli" />
+              </label>
+              <label>Komisyon (adet)
+                <input className="input" inputMode="decimal" value={assetDraftInputs.feeQuantity} onChange={(event) => {
+                  const value = event.target.value;
+                  setAssetDraftInputs((draft) => ({ ...draft, feeQuantity: value }));
+                }} placeholder={assetDraft.ticker || "Varlik adedi"} />
+              </label>
               <label>Hedef pay (%)
                 <input className="input" inputMode="decimal" value={assetDraftInputs.target} onChange={(event) => {
                   const value = event.target.value;
@@ -3742,7 +3763,7 @@ export default function Home() {
               <label>Not
                 <input className="input" value={assetDraft.note} onChange={(event) => setAssetDraft({ ...assetDraft, note: event.target.value })} />
               </label>
-              <div className="auto-summary wide">Toplam maliyet: <strong>{money(parseAmount(assetDraftInputs.quantity) * parseAmount(assetDraftInputs.avgCost), assetDraft.currency)}</strong></div>
+              <div className="auto-summary wide">Toplam maliyet: <strong>{money(parseAmount(assetDraftInputs.quantity) * parseAmount(assetDraftInputs.avgCost) + parseAmount(assetDraftInputs.fee), assetDraft.currency)}</strong>{parseAmount(assetDraftInputs.feeQuantity) ? <small>Net adet: {num(Math.max(0, parseAmount(assetDraftInputs.quantity) - parseAmount(assetDraftInputs.feeQuantity)))}</small> : null}</div>
             </div>
             <div className="modal-footer">
               <button type="button" className="secondary" onClick={() => setAssetDraft(null)}>Vazgec</button>

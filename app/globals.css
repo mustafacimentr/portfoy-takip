@@ -2291,9 +2291,16 @@ th {
 
 .transaction-form {
   display: grid;
-  grid-template-columns: 110px 140px repeat(5, minmax(0, 1fr)) 80px;
   gap: 8px;
   align-items: center;
+}
+
+.transaction-form.position-mode {
+  grid-template-columns: 110px 140px repeat(5, minmax(0, 1fr)) 80px;
+}
+
+.transaction-form.amount-mode {
+  grid-template-columns: 130px 150px minmax(180px, 1fr) minmax(180px, 1fr) 80px;
 }
 
 .transaction-hint {
@@ -2512,6 +2519,8 @@ label {
   .benchmark-grid,
   .source-grid,
   .transaction-form,
+  .transaction-form.position-mode,
+  .transaction-form.amount-mode,
   .transaction-row,
   .asset-detail-grid,
   .asset-detail-body {

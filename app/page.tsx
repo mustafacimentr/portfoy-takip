@@ -459,6 +459,20 @@ function signedMoney(value: number) {
   return `${value >= 0 ? "+" : ""}${money(value)}`;
 }
 
+function isPositionTransaction(type: string) {
+  return type === "buy" || type === "sell";
+}
+
+function transactionAmountPlaceholder(type: string) {
+  if (type === "dividend") return "Temettu tutari";
+  if (type === "distribution") return "Dagitim tutari";
+  if (type === "fee") return "Komisyon tutari";
+  if (type === "tax") return "Vergi tutari";
+  if (type === "sell") return "Satis tutari";
+  if (type === "buy") return "Alis tutari";
+  return "Tutar";
+}
+
 function plainDate(value = new Date()) {
   return value.toISOString().slice(0, 10);
 }
@@ -1999,7 +2013,7 @@ export default function Home() {
   async function submitTransaction(event: FormEvent) {
     event.preventDefault();
     if (!selectedAssetDetail) return;
-    const isPositionTrade = transactionDraft.type === "buy" || transactionDraft.type === "sell";
+    const isPositionTrade = isPositionTransaction(transactionDraft.type);
     const amount = parseAmount(transactionDraft.amount);
     const price = parseAmount(transactionDraft.price) || (!isPositionTrade ? amount : selectedAssetDetail.asset.price || selectedAssetDetail.asset.avgCost);
     const quantity = parseAmount(transactionDraft.quantity) || (amount && price ? amount / price : 0);
@@ -3792,8 +3806,17 @@ export default function Home() {
                 </div>
                 <strong className={selectedAssetDetail.netRealized >= 0 ? "positive" : "negative"}>{signedMoney(selectedAssetDetail.netRealized)}</strong>
               </div>
-              <form className="transaction-form" onSubmit={(event) => void submitTransaction(event)}>
-                <select value={transactionDraft.type} onChange={(event) => setTransactionDraft({ ...transactionDraft, type: event.target.value })}>
+              <form className={`transaction-form ${isPositionTransaction(transactionDraft.type) ? "position-mode" : "amount-mode"}`} onSubmit={(event) => void submitTransaction(event)}>
+                <select value={transactionDraft.type} onChange={(event) => {
+                  const nextType = event.target.value;
+                  setTransactionDraft({
+                    ...transactionDraft,
+                    type: nextType,
+                    quantity: isPositionTransaction(nextType) ? transactionDraft.quantity : "",
+                    price: isPositionTransaction(nextType) ? transactionDraft.price : "",
+                    fee: isPositionTransaction(nextType) ? transactionDraft.fee : "",
+                  });
+                }}>
                   <option value="buy">Alis</option>
                   <option value="sell">Satis</option>
                   <option value="dividend">Temettu</option>
@@ -3803,14 +3826,20 @@ export default function Home() {
                   <option value="transfer">Transfer</option>
                 </select>
                 <input className="input" type="date" value={transactionDraft.date} onChange={(event) => setTransactionDraft({ ...transactionDraft, date: event.target.value })} />
-                <input className="input" value={transactionDraft.quantity} onChange={(event) => setTransactionDraft({ ...transactionDraft, quantity: event.target.value })} placeholder="Adet" />
-                <input className="input" value={transactionDraft.price} onChange={(event) => setTransactionDraft({ ...transactionDraft, price: event.target.value })} placeholder={["dividend", "distribution", "fee", "tax"].includes(transactionDraft.type) ? "Tutar" : "Fiyat"} />
-                <input className="input" value={transactionDraft.amount} onChange={(event) => setTransactionDraft({ ...transactionDraft, amount: event.target.value })} placeholder={transactionDraft.type === "sell" ? "Satis tutari" : transactionDraft.type === "buy" ? "Alis tutari" : "Toplam tutar"} />
-                <input className="input" value={transactionDraft.fee} onChange={(event) => setTransactionDraft({ ...transactionDraft, fee: event.target.value })} placeholder="Komisyon" />
+                {isPositionTransaction(transactionDraft.type) ? (
+                  <>
+                    <input className="input" value={transactionDraft.quantity} onChange={(event) => setTransactionDraft({ ...transactionDraft, quantity: event.target.value })} placeholder="Adet" />
+                    <input className="input" value={transactionDraft.price} onChange={(event) => setTransactionDraft({ ...transactionDraft, price: event.target.value })} placeholder="Fiyat" />
+                    <input className="input" value={transactionDraft.amount} onChange={(event) => setTransactionDraft({ ...transactionDraft, amount: event.target.value })} placeholder={transactionAmountPlaceholder(transactionDraft.type)} />
+                    <input className="input" value={transactionDraft.fee} onChange={(event) => setTransactionDraft({ ...transactionDraft, fee: event.target.value })} placeholder="Komisyon" />
+                  </>
+                ) : (
+                  <input className="input" value={transactionDraft.amount} onChange={(event) => setTransactionDraft({ ...transactionDraft, amount: event.target.value })} placeholder={transactionAmountPlaceholder(transactionDraft.type)} />
+                )}
                 <input className="input" value={transactionDraft.note} onChange={(event) => setTransactionDraft({ ...transactionDraft, note: event.target.value })} placeholder="Not" />
                 <button className="primary">Ekle</button>
               </form>
-              <p className="transaction-hint">Alis ve satislarda adet ya da toplam tutar girebilirsin. Toplam tutar girersen sistem fiyat uzerinden adedi hesaplar; satislarda kalan adet ve gerceklesmis kar otomatik islenir.</p>
+              <p className="transaction-hint">{isPositionTransaction(transactionDraft.type) ? "Alis ve satislarda adet ya da toplam tutar girebilirsin. Toplam tutar girersen sistem fiyat uzerinden adedi hesaplar; satislarda kalan adet ve gerceklesmis kar otomatik islenir." : "Bu islem turunde sadece tarih, tutar ve not yeterli. Adet, fiyat ve komisyon bilgisi gerekmez."}</p>
               <div className="transaction-list">
                 {selectedAssetDetail.transactions.length ? selectedAssetDetail.transactions.map((tx) => {
                   const label = tx.type === "buy" ? "Alis" : tx.type === "sell" ? "Satis" : tx.type === "dividend" ? "Temettu" : tx.type === "distribution" ? "Fon dagitimi" : tx.type === "fee" ? "Komisyon" : tx.type === "tax" ? "Vergi" : "Transfer";

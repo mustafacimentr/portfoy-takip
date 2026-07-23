@@ -640,12 +640,20 @@ function applyTransactionToAsset(asset: Asset, incoming: Transaction) {
   return { asset: normalizeAsset(nextAsset), transaction: normalizeTransaction(nextTx), error: "" };
 }
 
+function transactionSortRank(transaction: Transaction) {
+  if (transaction.type === "buy" && transaction.note.toLowerCase().includes("ilk varlik kaydi")) return 0;
+  if (transaction.type === "sell") return 1;
+  if (transaction.type === "buy") return 2;
+  return 3;
+}
+
 function sortTransactionsChronologically(transactions: Transaction[]) {
   return transactions
     .map((transaction, index) => ({ transaction: normalizeTransaction(transaction), index }))
     .sort((left, right) => {
       const byDate = left.transaction.date.localeCompare(right.transaction.date);
-      return byDate || left.index - right.index;
+      const byRank = transactionSortRank(left.transaction) - transactionSortRank(right.transaction);
+      return byDate || byRank || left.index - right.index;
     })
     .map((item) => item.transaction);
 }
@@ -706,6 +714,85 @@ function transactionWithAssetIdentity(tx: Partial<Transaction>, asset: Asset): P
     assetTicker: asset.ticker,
     assetName: asset.name,
     assetSymbol: asset.priceSymbol || asset.ticker,
+  };
+}
+
+function transactionIdentityCode(tx: Transaction) {
+  return compactCode(tx.assetTicker || tx.assetSymbol || tx.assetName || "");
+}
+
+function transactionBelongsToAsset(tx: Transaction, asset: Asset, assetsById: Map<string, Asset>) {
+  if (tx.assetId === asset.id) return true;
+  const assetCodes = [asset.ticker, asset.priceSymbol, asset.name].map(compactCode).filter(Boolean);
+  const txCode = transactionIdentityCode(tx);
+  if (txCode && assetCodes.includes(txCode)) return true;
+  const hasKnownAsset = Boolean(tx.assetId && assetsById.has(tx.assetId));
+  if (!hasKnownAsset && isPositionTransaction(tx.type) && tx.price && asset.price) {
+    const diff = Math.abs(Number(asset.price || 0) - Number(tx.price || 0));
+    return diff <= Math.max(0.05, Number(tx.price || 0) * 0.0025);
+  }
+  return false;
+}
+
+function repairPortfolioState(input: PortfolioState): PortfolioState {
+  const normalizedState: PortfolioState = {
+    assets: (input.assets || []).map(normalizeAsset),
+    transactions: (input.transactions || []).map(normalizeTransaction),
+    history: (input.history || []).map(normalizeSnapshot),
+    cashFlows: (input.cashFlows || []).map(normalizeCashFlow),
+    benchmarkHistory: (input.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+    settings: normalizeSettings(input.settings),
+  };
+  const assetsById = new Map(normalizedState.assets.map((asset) => [asset.id, asset]));
+  const transactionUpdates = new Map<string, Transaction>();
+  let changed = false;
+
+  const assets = normalizedState.assets.map((asset) => {
+    const related = normalizedState.transactions
+      .filter((tx) => !transactionUpdates.has(tx.id) || tx.assetId === asset.id)
+      .filter((tx) => transactionBelongsToAsset(tx, asset, assetsById))
+      .map((tx) => {
+        const identified = normalizeTransaction(transactionWithAssetIdentity(tx, asset));
+        if (
+          identified.assetId !== tx.assetId
+          || identified.assetTicker !== tx.assetTicker
+          || identified.assetSymbol !== tx.assetSymbol
+          || identified.assetName !== tx.assetName
+        ) {
+          changed = true;
+        }
+        return identified;
+      });
+    if (!related.some((tx) => isPositionTransaction(tx.type))) return asset;
+
+    const rebuilt = rebuildAssetFromTransactions(asset, related);
+    if (rebuilt.error) return asset;
+    rebuilt.transactions.forEach((tx) => transactionUpdates.set(tx.id, tx));
+    const nextAsset = normalizeAsset({
+      ...rebuilt.asset,
+      price: asset.price,
+      lastPriceAt: asset.lastPriceAt,
+      lastPriceError: asset.lastPriceError,
+      previousPrice: asset.previousPrice,
+      previousPriceAt: asset.previousPriceAt,
+      dayOpenPrice: asset.dayOpenPrice,
+      dayOpenDate: asset.dayOpenDate,
+      logoUrl: asset.logoUrl,
+    });
+    if (
+      Math.abs(nextAsset.quantity - asset.quantity) > 0.00000001
+      || Math.abs(nextAsset.avgCost - asset.avgCost) > 0.00000001
+    ) {
+      changed = true;
+    }
+    return nextAsset;
+  });
+
+  if (!changed) return normalizedState;
+  return {
+    ...normalizedState,
+    assets,
+    transactions: normalizedState.transactions.map((tx) => transactionUpdates.get(tx.id) || tx),
   };
 }
 
@@ -1784,7 +1871,10 @@ export default function Home() {
           status: realized >= 0 ? "positive" : "negative",
         };
       })
-      .sort((left, right) => right.tx.date.localeCompare(left.tx.date))
+      .sort((left, right) => {
+        const byDate = right.tx.date.localeCompare(left.tx.date);
+        return byDate || transactionSortRank(left.tx) - transactionSortRank(right.tx);
+      })
       .slice(0, 28);
   }, [state.assets, state.transactions]);
 
@@ -1814,7 +1904,7 @@ export default function Home() {
 
   async function loadPortfolio(code = passcode) {
     const data = await api<{ state: PortfolioState }>("/api/portfolio", code);
-    setState({
+    const loadedState = repairPortfolioState({
       assets: (data.state.assets || []).map(normalizeAsset),
       transactions: (data.state.transactions || []).map(normalizeTransaction),
       history: (data.state.history || []).map(normalizeSnapshot),
@@ -1822,6 +1912,7 @@ export default function Home() {
       benchmarkHistory: (data.state.benchmarkHistory || []).map(normalizeBenchmarkPoint),
       settings: normalizeSettings(data.state.settings),
     });
+    setState(loadedState);
     setLastSync(new Date().toISOString());
   }
 
@@ -1873,7 +1964,8 @@ export default function Home() {
   async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean; preserveFundHoldings?: boolean } = {}) {
     const shouldSnapshot = options.snapshot !== false;
     const protectedState = options.preserveFundHoldings ? withLatestFundHoldings(nextState) : nextState;
-    const finalState = shouldSnapshot ? withTodaySnapshot(protectedState) : protectedState;
+    const repairedState = repairPortfolioState(protectedState);
+    const finalState = shouldSnapshot ? withTodaySnapshot(repairedState) : repairedState;
     setState(finalState);
     setSaving(true);
     try {

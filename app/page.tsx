@@ -633,6 +633,35 @@ function applyTransactionToAsset(asset: Asset, incoming: Transaction) {
   return { asset: normalizeAsset(nextAsset), transaction: normalizeTransaction(nextTx), error: "" };
 }
 
+function sortTransactionsChronologically(transactions: Transaction[]) {
+  return transactions
+    .map((transaction, index) => ({ transaction: normalizeTransaction(transaction), index }))
+    .sort((left, right) => {
+      const byDate = left.transaction.date.localeCompare(right.transaction.date);
+      return byDate || left.index - right.index;
+    })
+    .map((item) => item.transaction);
+}
+
+function rebuildAssetFromTransactions(asset: Asset, transactions: Transaction[]) {
+  const ordered = sortTransactionsChronologically(transactions);
+  let nextAsset = normalizeAsset({ ...asset, quantity: 0, avgCost: 0 });
+  const rebuiltTransactions: Transaction[] = [];
+
+  for (const transaction of ordered) {
+    if (!isPositionTransaction(transaction.type)) {
+      rebuiltTransactions.push(normalizeTransaction(transaction));
+      continue;
+    }
+    const applied = applyTransactionToAsset(nextAsset, transaction);
+    if (applied.error) return { asset, transactions, error: applied.error };
+    nextAsset = applied.asset;
+    rebuiltTransactions.push(applied.transaction);
+  }
+
+  return { asset: normalizeAsset(nextAsset), transactions: rebuiltTransactions, error: "" };
+}
+
 function reverseLastTransactionOnAsset(asset: Asset, incoming: Transaction) {
   const tx = normalizeTransaction(incoming);
   const amount = Number(tx.amount || tx.quantity * tx.price || 0);
@@ -2041,15 +2070,27 @@ export default function Home() {
       alert("Islem icin tarih ve tutar bilgisi gerekli.");
       return;
     }
-    const applied = isPositionTrade ? applyTransactionToAsset(selectedAssetDetail.asset, tx) : { asset: selectedAssetDetail.asset, transaction: tx, error: "" };
+    const existingTransactions = state.transactions.map(normalizeTransaction);
+    const nextTransactions = [...existingTransactions, tx];
+    const relatedTransactions = nextTransactions.filter((item) => item.assetId === selectedAssetDetail.asset.id);
+    const shouldRebuildPosition = isPositionTrade;
+    const rebuilt = shouldRebuildPosition ? rebuildAssetFromTransactions(selectedAssetDetail.asset, relatedTransactions) : { asset: selectedAssetDetail.asset, transactions: relatedTransactions, error: "" };
+    const applied = shouldRebuildPosition && rebuilt.error
+      ? applyTransactionToAsset(selectedAssetDetail.asset, tx)
+      : {
+        asset: rebuilt.asset,
+        transaction: tx,
+        error: "",
+      };
     if (applied.error) {
       alert(applied.error);
       return;
     }
+    const rebuiltById = new Map((rebuilt.error ? relatedTransactions : rebuilt.transactions).map((item) => [item.id, item]));
     await savePortfolio({
       ...state,
       assets: state.assets.map((asset) => (asset.id === selectedAssetDetail.asset.id ? applied.asset : asset)),
-      transactions: [...state.transactions.map(normalizeTransaction), applied.transaction],
+      transactions: nextTransactions.map((item) => item.assetId === selectedAssetDetail.asset.id ? (rebuiltById.get(item.id) || item) : item),
     });
     setTransactionDraft({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   }
@@ -2058,14 +2099,20 @@ export default function Home() {
     const transactions = state.transactions.map(normalizeTransaction);
     const tx = transactions.find((item) => item.id === id);
     if (!tx) return;
-    const assetTransactions = transactions.filter((item) => item.assetId === tx.assetId);
-    const lastAssetTransaction = assetTransactions[assetTransactions.length - 1];
-    if (lastAssetTransaction?.id !== id) {
-      alert("Maliyet hesabinin bozulmamasi icin sadece ilgili varligin son islemi geri alinabilir.");
-      return;
-    }
-    const assets = state.assets.map((asset) => (asset.id === tx.assetId ? reverseLastTransactionOnAsset(asset, tx) : asset));
-    await savePortfolio({ ...state, assets, transactions: transactions.filter((item) => item.id !== id) }, { snapshot: false });
+    const nextTransactions = transactions.filter((item) => item.id !== id);
+    const baseAsset = state.assets.find((asset) => asset.id === tx.assetId);
+    if (!baseAsset) return;
+    const relatedTransactions = nextTransactions.filter((item) => item.assetId === tx.assetId);
+    const shouldRebuildPosition = isPositionTransaction(tx.type);
+    const rebuilt = shouldRebuildPosition ? rebuildAssetFromTransactions(baseAsset, relatedTransactions) : { asset: baseAsset, transactions: relatedTransactions, error: "" };
+    const nextAsset = shouldRebuildPosition && rebuilt.error ? reverseLastTransactionOnAsset(baseAsset, tx) : rebuilt.asset;
+    const rebuiltById = new Map((rebuilt.error ? relatedTransactions : rebuilt.transactions).map((item) => [item.id, item]));
+    const assets = state.assets.map((asset) => (asset.id === tx.assetId ? nextAsset : asset));
+    await savePortfolio({
+      ...state,
+      assets,
+      transactions: nextTransactions.map((item) => item.assetId === tx.assetId ? (rebuiltById.get(item.id) || item) : item),
+    }, { snapshot: false });
   }
 
   async function importBackup(file: File) {
@@ -3850,8 +3897,8 @@ export default function Home() {
                 {isPositionTransaction(transactionDraft.type) ? (
                   <>
                     <input className="input" value={transactionDraft.quantity} onChange={(event) => setTransactionDraft({ ...transactionDraft, quantity: event.target.value })} placeholder="Adet" />
-                    <input className="input" value={transactionDraft.price} onChange={(event) => setTransactionDraft({ ...transactionDraft, price: event.target.value })} placeholder="Fiyat" />
-                    <input className="input" value={transactionDraft.amount} onChange={(event) => setTransactionDraft({ ...transactionDraft, amount: event.target.value })} placeholder={transactionAmountPlaceholder(transactionDraft.type)} />
+                    <input className="input" value={transactionDraft.price} onChange={(event) => setTransactionDraft({ ...transactionDraft, price: event.target.value })} placeholder="Birim fiyat" />
+                    <input className="input" value={transactionDraft.amount} onChange={(event) => setTransactionDraft({ ...transactionDraft, amount: event.target.value })} placeholder={transactionDraft.type === "buy" ? "Toplam alis tutari" : transactionDraft.type === "sell" ? "Toplam satis tutari" : transactionAmountPlaceholder(transactionDraft.type)} />
                     <input className="input" value={transactionDraft.fee} onChange={(event) => setTransactionDraft({ ...transactionDraft, fee: event.target.value })} placeholder="Komisyon" />
                   </>
                 ) : (
@@ -3860,7 +3907,7 @@ export default function Home() {
                 <input className="input" value={transactionDraft.note} onChange={(event) => setTransactionDraft({ ...transactionDraft, note: event.target.value })} placeholder="Not" />
                 <button className="primary">Ekle</button>
               </form>
-              <p className="transaction-hint">{isPositionTransaction(transactionDraft.type) ? "Alis ve satislarda adet ya da toplam tutar girebilirsin. Toplam tutar girersen sistem fiyat uzerinden adedi hesaplar; satislarda kalan adet ve gerceklesmis kar otomatik islenir." : "Bu islem turunde sadece tarih, tutar ve not yeterli. Adet, fiyat ve komisyon bilgisi gerekmez."}</p>
+              <p className="transaction-hint">{isPositionTransaction(transactionDraft.type) ? "Alis ve satislarda adet + birim fiyat girersen toplam tutari sistem hesaplar. Toplam tutar alanini yalnizca emrin toplam TL degerini biliyorsan kullan; gecmise donuk islemler tarih sirasina gore yeniden hesaplanir." : "Bu islem turunde sadece tarih, tutar ve not yeterli. Adet, fiyat ve komisyon bilgisi gerekmez."}</p>
               <div className="transaction-list">
                 {selectedAssetDetail.transactions.length ? selectedAssetDetail.transactions.map((tx) => {
                   const label = tx.type === "buy" ? "Alis" : tx.type === "sell" ? "Satis" : tx.type === "dividend" ? "Temettu" : tx.type === "distribution" ? "Fon dagitimi" : tx.type === "fee" ? "Komisyon" : tx.type === "tax" ? "Vergi" : "Transfer";

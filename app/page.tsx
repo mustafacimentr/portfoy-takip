@@ -662,6 +662,30 @@ function rebuildAssetFromTransactions(asset: Asset, transactions: Transaction[])
   return { asset: normalizeAsset(nextAsset), transactions: rebuiltTransactions, error: "" };
 }
 
+function summarizeAssetTransactions(asset: Asset, transactions: Transaction[]) {
+  return transactions
+    .map(normalizeTransaction)
+    .filter((tx) => tx.assetId === asset.id)
+    .reduce((summary, tx) => {
+      const gross = tx.amount || tx.quantity * tx.price;
+      if (tx.type === "buy") summary.buyTotal += gross + (tx.fee || 0);
+      if (tx.type === "sell") {
+        summary.sellTotal += gross - (tx.fee || 0);
+        summary.realizedProfit += Number.isFinite(Number(tx.realizedProfit)) && tx.realizedProfit !== 0
+          ? Number(tx.realizedProfit)
+          : gross - Number(tx.costBasis || tx.quantity * asset.avgCost) - (tx.fee || 0);
+      }
+      if (tx.type === "dividend" || tx.type === "distribution") summary.income += tx.amount || tx.price;
+      if (tx.type === "fee" || tx.type === "tax") summary.expense += (tx.amount || tx.price) + (tx.fee || 0);
+      if (tx.type === "transfer") summary.transferCount += 1;
+      return summary;
+    }, { buyTotal: 0, sellTotal: 0, realizedProfit: 0, income: 0, expense: 0, transferCount: 0 });
+}
+
+function realizedNetFromSummary(summary: ReturnType<typeof summarizeAssetTransactions>) {
+  return summary.realizedProfit + summary.income - summary.expense;
+}
+
 function reverseLastTransactionOnAsset(asset: Asset, incoming: Transaction) {
   const tx = normalizeTransaction(incoming);
   const amount = Number(tx.amount || tx.quantity * tx.price || 0);
@@ -881,8 +905,12 @@ export default function Home() {
 
   const totals = useMemo(() => {
     const calculated = totalsFromAssets(state.assets);
-    return { totalValue: calculated.totalValue, totalCost: calculated.totalCost, cash: calculated.cash, pl: calculated.profitLoss, rate: calculated.rate };
-  }, [state.assets]);
+    const realized = state.assets.reduce((sum, asset) => sum + realizedNetFromSummary(summarizeAssetTransactions(asset, state.transactions)), 0);
+    const buyTotal = state.assets.reduce((sum, asset) => sum + summarizeAssetTransactions(asset, state.transactions).buyTotal, 0);
+    const pl = calculated.profitLoss + realized;
+    const rateBase = buyTotal || calculated.totalCost;
+    return { totalValue: calculated.totalValue, totalCost: calculated.totalCost, cash: calculated.cash, pl, rate: rateBase ? (pl / rateBase) * 100 : 0 };
+  }, [state.assets, state.transactions]);
 
   const historySeries = useMemo(() => {
     const todayTotals = totalsFromAssets(state.assets);
@@ -892,7 +920,7 @@ export default function Home() {
       totalValue: todayTotals.totalValue,
       totalCost: todayTotals.totalCost,
       cash: todayTotals.cash,
-      profitLoss: todayTotals.profitLoss,
+      profitLoss: totals.pl,
       assetCount: state.assets.length,
     });
     const byDate = new Map<string, PortfolioSnapshot>();
@@ -904,7 +932,7 @@ export default function Home() {
     minDate.setDate(minDate.getDate() - selected.days + 1);
     const cutoff = plainDate(minDate);
     return sorted.filter((snapshot) => snapshot.date >= cutoff);
-  }, [state.assets, state.history, historyRange]);
+  }, [state.assets, state.history, historyRange, totals.pl]);
 
   const performanceStats = useMemo(() => {
     const first = historySeries[0];
@@ -1051,10 +1079,16 @@ export default function Home() {
           });
         const value = assets.reduce((sum, asset) => sum + asset.quantity * asset.price * (asset.fxRate || 1), 0);
         const cost = assets.reduce((sum, asset) => sum + asset.quantity * asset.avgCost * (asset.fxRate || 1), 0);
-        return { ...group, assets, value, cost, profitLoss: value - cost };
+        const profitLoss = assets.reduce((sum, asset) => {
+          const assetValue = asset.quantity * asset.price * (asset.fxRate || 1);
+          const assetCost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
+          const realized = realizedNetFromSummary(summarizeAssetTransactions(asset, state.transactions));
+          return sum + assetValue - assetCost + realized;
+        }, 0);
+        return { ...group, assets, value, cost, profitLoss };
       })
       .filter((group) => group.assets.length > 0);
-  }, [filteredAssets]);
+  }, [filteredAssets, state.transactions]);
 
   const targetRows = useMemo(() => {
     const targets = normalizeSettings(state.settings).targetAllocations;
@@ -1138,6 +1172,10 @@ export default function Home() {
       .map((asset) => {
         const value = asset.quantity * asset.price * (asset.fxRate || 1);
         const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
+        const transactionSummary = summarizeAssetTransactions(asset, state.transactions);
+        const netRealized = realizedNetFromSummary(transactionSummary);
+        const totalProfitLoss = value - cost + netRealized;
+        const performanceCost = transactionSummary.buyTotal || cost;
         const basePrice = dailyBasePrice(asset);
         const baseValue = basePrice > 0 ? asset.quantity * basePrice * (asset.fxRate || 1) : 0;
         const dailyChange = baseValue ? value - baseValue : 0;
@@ -1147,8 +1185,11 @@ export default function Home() {
           asset,
           value,
           cost,
-          profitLoss: value - cost,
-          returnRate: cost ? ((value - cost) / cost) * 100 : 0,
+          profitLoss: totalProfitLoss,
+          openProfitLoss: value - cost,
+          netRealized,
+          performanceCost,
+          returnRate: performanceCost ? (totalProfitLoss / performanceCost) * 100 : 0,
           dailyChange,
           dailyRate: baseValue ? (dailyChange / baseValue) * 100 : 0,
           hasDailyChange: baseValue > 0,
@@ -1158,7 +1199,7 @@ export default function Home() {
         };
       })
       .sort((left, right) => right.value - left.value);
-  }, [state.assets, totals.totalValue]);
+  }, [state.assets, state.transactions, totals.totalValue]);
 
   const bestAsset = useMemo(() => {
     return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => right.returnRate - left.returnRate)[0];
@@ -1330,8 +1371,6 @@ export default function Home() {
     if (!asset) return null;
     const value = asset.quantity * asset.price * (asset.fxRate || 1);
     const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
-    const profitLoss = value - cost;
-    const returnRate = cost ? (profitLoss / cost) * 100 : 0;
     const groupKey = assetGroupKey(asset);
     const group = groupDefinitions.find((item) => item.key === groupKey) || groupDefinitions[groupDefinitions.length - 1];
     const groupValue = state.assets
@@ -1354,21 +1393,12 @@ export default function Home() {
       .map(normalizeTransaction)
       .filter((tx) => tx.assetId === asset.id)
       .sort((left, right) => right.date.localeCompare(left.date));
-    const transactionSummary = transactions.reduce((summary, tx) => {
-      const gross = tx.amount || tx.quantity * tx.price;
-      if (tx.type === "buy") summary.buyTotal += gross + (tx.fee || 0);
-      if (tx.type === "sell") {
-        summary.sellTotal += gross - (tx.fee || 0);
-        summary.realizedProfit += Number.isFinite(Number(tx.realizedProfit)) && tx.realizedProfit !== 0
-          ? Number(tx.realizedProfit)
-          : gross - Number(tx.costBasis || tx.quantity * asset.avgCost) - (tx.fee || 0);
-      }
-      if (tx.type === "dividend" || tx.type === "distribution") summary.income += tx.amount || tx.price;
-      if (tx.type === "fee" || tx.type === "tax") summary.expense += (tx.amount || tx.price) + (tx.fee || 0);
-      if (tx.type === "transfer") summary.transferCount += 1;
-      return summary;
-    }, { buyTotal: 0, sellTotal: 0, realizedProfit: 0, income: 0, expense: 0, transferCount: 0 });
-    const netRealized = transactionSummary.realizedProfit + transactionSummary.income - transactionSummary.expense;
+    const transactionSummary = summarizeAssetTransactions(asset, state.transactions);
+    const netRealized = realizedNetFromSummary(transactionSummary);
+    const openProfitLoss = value - cost;
+    const profitLoss = openProfitLoss + netRealized;
+    const returnBase = transactionSummary.buyTotal || cost;
+    const returnRate = returnBase ? (profitLoss / returnBase) * 100 : 0;
     const notes = [
       rank > 0 && rank <= 3 ? "Bu varlik portfoyun en buyuk 3 pozisyonundan biri." : "",
       asset.target ? (targetGap >= 0 ? "Hedef payinin altinda; yeni yatirimlarda desteklenebilir." : "Hedef payinin uzerinde; agirligi izlenebilir.") : "Bu varlik icin hedef pay belirlenmemis.",
@@ -1376,7 +1406,7 @@ export default function Home() {
       transactions.length ? `${transactions.length} islem kaydi tutuluyor; gerceklesmis sonuc ayrica izleniyor.` : "Bu varlik icin henuz islem gecmisi yok.",
       priceStatus === "Guncel" ? "Fiyat verisi guncel." : priceStatus === "Eski" ? "Fiyat verisi 24 saatten eski olabilir." : priceStatus === "Hata" ? "Fiyat kaynaginda hata kaydi var." : "Fiyat guncelleme kaydi yok.",
     ].filter(Boolean);
-    return { asset, value, cost, profitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes, transactions, transactionSummary, netRealized };
+    return { asset, value, cost, profitLoss, openProfitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes, transactions, transactionSummary, netRealized };
   }, [portfolioRows, selectedAssetId, state.assets, state.transactions, totals.totalValue]);
 
   const dataStatusRows = useMemo(() => {
@@ -1666,6 +1696,7 @@ export default function Home() {
 
   function withTodaySnapshot(nextState: PortfolioState) {
     const calculated = totalsFromAssets(nextState.assets);
+    const realized = nextState.assets.reduce((sum, asset) => sum + realizedNetFromSummary(summarizeAssetTransactions(asset, nextState.transactions || [])), 0);
     if (!nextState.assets.length) {
       return {
         ...nextState,
@@ -1682,7 +1713,7 @@ export default function Home() {
       totalValue: calculated.totalValue,
       totalCost: calculated.totalCost,
       cash: calculated.cash,
-      profitLoss: calculated.profitLoss,
+      profitLoss: calculated.profitLoss + realized,
       assetCount: nextState.assets.length,
     });
     const history = [...(nextState.history || []).map(normalizeSnapshot).filter((item) => item.date !== today), snapshot]
@@ -3340,8 +3371,11 @@ export default function Home() {
                 {filteredAssets.length ? filteredAssets.map((asset, index) => {
                   const value = asset.quantity * asset.price * (asset.fxRate || 1);
                   const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
-                  const pl = value - cost;
-                  const plRate = cost ? (pl / cost) * 100 : 0;
+                  const txSummary = summarizeAssetTransactions(asset, state.transactions);
+                  const netRealized = realizedNetFromSummary(txSummary);
+                  const pl = value - cost + netRealized;
+                  const plRateBase = txSummary.buyTotal || cost;
+                  const plRate = plRateBase ? (pl / plRateBase) * 100 : 0;
                   const previous = filteredAssets[index - 1];
                   const currentGroupKey = assetGroupKey(asset);
                   const showGroup = !previous || assetGroupKey(previous) !== currentGroupKey;
@@ -3374,7 +3408,7 @@ export default function Home() {
                       <td>{money(cost)}</td>
                       <td>{money(asset.price, asset.currency)}</td>
                       <td>{money(value)}</td>
-                      <td className={pl >= 0 ? "positive" : "negative"}>{money(pl)}</td>
+                      <td className={pl >= 0 ? "positive" : "negative"}>{signedMoney(pl)}</td>
                       <td><span className={pl >= 0 ? "performance-badge positive" : "performance-badge negative"}>{signedPct(plRate)}</span></td>
                       <td className="row-actions">
                         <button className="icon-btn text-btn transaction-action-btn" onClick={() => openAssetDetail(asset)} title="Islem gecmisini ac">Islem</button>
@@ -3530,8 +3564,11 @@ export default function Home() {
                   {filteredAssets.map((asset, index) => {
                     const value = asset.quantity * asset.price * (asset.fxRate || 1);
                     const cost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
-                    const pl = value - cost;
-                    const plRate = cost ? (pl / cost) * 100 : 0;
+                    const txSummary = summarizeAssetTransactions(asset, state.transactions);
+                    const netRealized = realizedNetFromSummary(txSummary);
+                    const pl = value - cost + netRealized;
+                    const plRateBase = txSummary.buyTotal || cost;
+                    const plRate = plRateBase ? (pl / plRateBase) * 100 : 0;
                     const previous = filteredAssets[index - 1];
                     const currentGroupKey = assetGroupKey(asset);
                     const showGroup = !previous || assetGroupKey(previous) !== currentGroupKey;

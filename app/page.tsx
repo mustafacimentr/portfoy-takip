@@ -26,6 +26,7 @@ type Asset = {
   dayOpenPrice?: number;
   dayOpenDate?: string;
   logoUrl?: string;
+  createdAt?: string;
 };
 
 type Transaction = {
@@ -944,6 +945,7 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
     dayOpenPrice: Number.isFinite(Number(asset.dayOpenPrice)) ? Number(asset.dayOpenPrice) : undefined,
     dayOpenDate: asset.dayOpenDate,
     logoUrl: asset.logoUrl,
+    createdAt: asset.createdAt,
   };
 }
 
@@ -982,6 +984,7 @@ function mergeAssetCluster(assets: Asset[]) {
   return normalizeAsset({
     ...primary,
     id: primary.id,
+    createdAt: normalized.map((asset) => asset.createdAt).filter(Boolean).sort()[0] || primary.createdAt,
     quantity,
     avgCost: quantity ? totalCost / quantity : Number(primary.avgCost || 0),
     price: Number(bestPriceAsset.price || primary.price || 0),
@@ -1268,6 +1271,22 @@ export default function Home() {
       .map(([key, assets]) => ({ key, assets }))
       .filter((group) => group.assets.length > 1);
   }, [state.assets]);
+
+  const firstPortfolioDate = useMemo(() => {
+    return state.history.map((item) => item.date).filter(Boolean).sort()[0] || plainDate();
+  }, [state.history]);
+
+  const missingInitialPositionAssets = useMemo(() => {
+    const positionAssetIds = new Set(
+      state.transactions
+        .map(normalizeTransaction)
+        .filter((tx) => isPositionTransaction(tx.type))
+        .map((tx) => tx.assetId),
+    );
+    return state.assets
+      .map(normalizeAsset)
+      .filter((asset) => asset.type !== "Nakit" && asset.quantity > 0 && asset.avgCost > 0 && !positionAssetIds.has(asset.id));
+  }, [state.assets, state.transactions]);
 
   const targetRows = useMemo(() => {
     const targets = normalizeSettings(state.settings).targetAllocations;
@@ -2127,6 +2146,7 @@ export default function Home() {
     const adjustedAvgCost = netQuantity ? totalCost / netQuantity : priceCost;
     const numericDraft = normalizeAsset({
       ...assetDraft,
+      createdAt: assetDraft.createdAt || plainDate(),
       quantity: netQuantity,
       avgCost: adjustedAvgCost,
       target: parseAmount(assetDraftInputs.target),
@@ -2438,6 +2458,45 @@ export default function Home() {
       assets: [...untouchedAssets, ...mergedAssets],
       transactions,
     });
+  }
+
+  async function createInitialPositionStories() {
+    if (!missingInitialPositionAssets.length) {
+      alert("Hikayesi eksik pozisyon yok.");
+      return;
+    }
+    const summary = missingInitialPositionAssets.map((asset) => `${asset.ticker}: ${num(asset.quantity)} adet`).join("\n");
+    if (!confirm(`${missingInitialPositionAssets.length} varlik icin baslangic alis kaydi olusturulacak.\n\n${summary}\n\nTarih olarak portfoye ekleme/ilk portfoy kayit tarihi kullanilacak. Devam edilsin mi?`)) return;
+
+    const assetDateMap = new Map(missingInitialPositionAssets.map((asset) => [asset.id, asset.createdAt || firstPortfolioDate]));
+    const assets = state.assets.map((asset) => {
+      const normalized = normalizeAsset(asset);
+      return assetDateMap.has(normalized.id) ? { ...normalized, createdAt: assetDateMap.get(normalized.id) } : normalized;
+    });
+    const initialTransactions = missingInitialPositionAssets.map((asset) => {
+      const date = assetDateMap.get(asset.id) || firstPortfolioDate;
+      return normalizeTransaction(transactionWithAssetIdentity({
+        id: uid(),
+        date,
+        type: "buy",
+        quantity: asset.quantity,
+        price: asset.avgCost,
+        amount: asset.quantity * asset.avgCost,
+        fee: 0,
+        costBasis: asset.quantity * asset.avgCost,
+        realizedProfit: 0,
+        resultingQuantity: asset.quantity,
+        resultingAvgCost: asset.avgCost,
+        note: "Baslangic pozisyon kaydi",
+      }, asset));
+    });
+
+    await savePortfolio({
+      ...state,
+      assets,
+      transactions: [...state.transactions.map(normalizeTransaction), ...initialTransactions],
+    }, { snapshot: false, preserveFundHoldings: true });
+    alert(`${initialTransactions.length} baslangic alis kaydi olusturuldu.`);
   }
 
   async function submitTransaction(event: FormEvent) {
@@ -2942,6 +3001,7 @@ export default function Home() {
             <button className="secondary" onClick={printPortfolioReport}>PDF raporu</button>
             <button className="secondary" onClick={exportBackup}>Yedek indir</button>
             <button className="secondary" onClick={() => void mergeDuplicateAssets()} disabled={!duplicateAssetGroups.length}>Tekrarlananlari birlestir{duplicateAssetGroups.length ? ` (${duplicateAssetGroups.length})` : ""}</button>
+            <button className="secondary" onClick={() => void createInitialPositionStories()} disabled={!missingInitialPositionAssets.length}>Eksik hikayeleri olustur{missingInitialPositionAssets.length ? ` (${missingInitialPositionAssets.length})` : ""}</button>
             <button className="secondary" onClick={() => openQuickSell()} disabled={!sellableAssets.length}>Varlik sat</button>
             <label className="file-button">
               Yedek yukle

@@ -477,6 +477,21 @@ function transactionAmountPlaceholder(type: string) {
   return "Tutar";
 }
 
+function transactionTypeLabel(type: string) {
+  if (type === "buy") return "Alis";
+  if (type === "sell") return "Satis";
+  if (type === "dividend") return "Temettu";
+  if (type === "distribution") return "Fon dagitimi";
+  if (type === "fee") return "Komisyon";
+  if (type === "tax") return "Vergi";
+  if (type === "transfer") return "Transfer";
+  return "Islem";
+}
+
+function transactionCashAmount(tx: Transaction) {
+  return Number(tx.amount || (isPositionTransaction(tx.type) ? tx.quantity * tx.price : tx.price) || 0);
+}
+
 function plainDate(value = new Date()) {
   return value.toISOString().slice(0, 10);
 }
@@ -1560,16 +1575,68 @@ export default function Home() {
         : priceAgeHours > 24
           ? "Eski"
           : "Guncel";
-    const transactions = state.transactions
+    const chronologicalTransactions = sortTransactionsChronologically(state.transactions
       .map(normalizeTransaction)
-      .filter((tx) => tx.assetId === asset.id)
-      .sort((left, right) => right.date.localeCompare(left.date));
+      .filter((tx) => tx.assetId === asset.id));
+    const transactions = chronologicalTransactions.slice().reverse();
     const transactionSummary = summarizeAssetTransactions(asset, state.transactions);
     const netRealized = realizedNetFromSummary(transactionSummary);
     const openProfitLoss = value - cost;
     const profitLoss = openProfitLoss + netRealized;
     const returnBase = historicalPerformanceBase(cost, transactionSummary);
     const returnRate = returnBase ? (profitLoss / returnBase) * 100 : 0;
+    const storyRows = chronologicalTransactions.map((tx, index) => {
+      const amount = transactionCashAmount(tx);
+      const label = transactionTypeLabel(tx.type);
+      const isIncome = tx.type === "dividend" || tx.type === "distribution";
+      const isExpense = tx.type === "fee" || tx.type === "tax";
+      const realized = tx.type === "sell"
+        ? Number(tx.realizedProfit || 0)
+        : isIncome
+          ? amount
+          : isExpense
+            ? -Math.abs(amount + Number(tx.fee || 0))
+            : 0;
+      const realizedRate = tx.type === "sell" && tx.costBasis ? (realized / tx.costBasis) * 100 : 0;
+      const tone = tx.type === "buy" ? "buy" : tx.type === "sell" ? (realized >= 0 ? "positive" : "negative") : isIncome ? "positive" : isExpense ? "negative" : "neutral";
+      const title = tx.type === "buy"
+        ? `${num(tx.quantity)} adet alis`
+        : tx.type === "sell"
+          ? `${num(tx.quantity)} adet satis`
+          : isIncome
+            ? `${label} geliri`
+            : isExpense
+              ? `${label} gideri`
+              : label;
+      const resultLabel = tx.type === "buy"
+        ? "Yeni ortalama"
+        : tx.type === "sell"
+          ? "Gerceklesen sonuc"
+          : isIncome
+            ? "Gelir"
+            : isExpense
+              ? "Gider"
+              : "Kayit";
+      const resultText = tx.type === "buy"
+        ? money(tx.resultingAvgCost || tx.price || 0, asset.currency)
+        : tx.type === "sell"
+          ? `${signedMoney(realized)}${realizedRate ? ` · ${signedPct(realizedRate)}` : ""}`
+          : isIncome || isExpense
+            ? signedMoney(realized)
+            : money(amount);
+      return {
+        tx,
+        index: index + 1,
+        label,
+        title,
+        tone,
+        amount,
+        resultLabel,
+        resultText,
+        realized,
+        remaining: isPositionTransaction(tx.type) ? Number(tx.resultingQuantity || 0) : null,
+      };
+    });
     const notes = [
       rank > 0 && rank <= 3 ? "Bu varlik portfoyun en buyuk 3 pozisyonundan biri." : "",
       asset.target ? (targetGap >= 0 ? "Hedef payinin altinda; yeni yatirimlarda desteklenebilir." : "Hedef payinin uzerinde; agirligi izlenebilir.") : "Bu varlik icin hedef pay belirlenmemis.",
@@ -1577,7 +1644,7 @@ export default function Home() {
       transactions.length ? `${transactions.length} islem kaydi tutuluyor; gerceklesmis sonuc ayrica izleniyor.` : "Bu varlik icin henuz islem gecmisi yok.",
       priceStatus === "Guncel" ? "Fiyat verisi guncel." : priceStatus === "Eski" ? "Fiyat verisi 24 saatten eski olabilir." : priceStatus === "Hata" ? "Fiyat kaynaginda hata kaydi var." : "Fiyat guncelleme kaydi yok.",
     ].filter(Boolean);
-    return { asset, value, cost, profitLoss, openProfitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes, transactions, transactionSummary, netRealized };
+    return { asset, value, cost, profitLoss, openProfitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes, transactions, storyRows, transactionSummary, netRealized };
   }, [portfolioRows, selectedAssetId, state.assets, state.transactions, totals.totalValue]);
 
   const dataStatusRows = useMemo(() => {
@@ -4411,20 +4478,58 @@ export default function Home() {
                 <button className="primary">Ekle</button>
               </form>
               <p className="transaction-hint">{isPositionTransaction(transactionDraft.type) ? "Alis ve satislarda adet + birim fiyat girersen toplam tutari sistem hesaplar. Toplam tutar alanini yalnizca emrin toplam TL degerini biliyorsan kullan; gecmise donuk islemler tarih sirasina gore yeniden hesaplanir." : "Bu islem turunde sadece tarih, tutar ve not yeterli. Adet, fiyat ve komisyon bilgisi gerekmez."}</p>
-              <div className="transaction-list">
-                {selectedAssetDetail.transactions.length ? selectedAssetDetail.transactions.map((tx) => {
-                  const label = tx.type === "buy" ? "Alis" : tx.type === "sell" ? "Satis" : tx.type === "dividend" ? "Temettu" : tx.type === "distribution" ? "Fon dagitimi" : tx.type === "fee" ? "Komisyon" : tx.type === "tax" ? "Vergi" : "Transfer";
-                  const amount = tx.amount || (tx.type === "buy" || tx.type === "sell" ? tx.quantity * tx.price : tx.price);
-                  return (
-                    <div className="transaction-row" key={tx.id}>
-                      <span className={`transaction-type ${tx.type}`}>{label}</span>
-                      <strong>{money(amount)}</strong>
-                      <small>{tx.date} - {tx.quantity ? `${num(tx.quantity)} adet` : "Tutar kaydi"}{tx.fee ? ` - Komisyon ${money(tx.fee)}` : ""}{tx.type === "sell" ? ` - Gerceklesen ${signedMoney(tx.realizedProfit || 0)}` : ""}{tx.type === "buy" || tx.type === "sell" ? ` - Kalan ${num(tx.resultingQuantity || 0)} adet` : ""}{tx.note ? ` - ${tx.note}` : ""}</small>
-                      <button className="icon-btn" onClick={() => void deleteTransaction(tx.id)} title="Sil">x</button>
-                    </div>
-                  );
-                }) : <div className="empty">Bu varlik icin henuz islem kaydi yok.</div>}
-              </div>
+              {selectedAssetDetail.transactions.length ? (
+                <>
+                  <div className="transaction-story-summary">
+                    <article>
+                      <span>Acik pozisyon</span>
+                      <strong>{num(selectedAssetDetail.asset.quantity)} adet</strong>
+                      <small>{money(selectedAssetDetail.cost)} maliyet</small>
+                    </article>
+                    <article className={selectedAssetDetail.openProfitLoss >= 0 ? "positive-card" : "negative-card"}>
+                      <span>Acik sonuc</span>
+                      <TrendValue trend={selectedAssetDetail.openProfitLoss}>{signedMoney(selectedAssetDetail.openProfitLoss)}</TrendValue>
+                      <small>Guncel fiyata gore</small>
+                    </article>
+                    <article className={selectedAssetDetail.netRealized >= 0 ? "positive-card" : "negative-card"}>
+                      <span>Gerceklesmis</span>
+                      <TrendValue trend={selectedAssetDetail.netRealized}>{signedMoney(selectedAssetDetail.netRealized)}</TrendValue>
+                      <small>Satis ve gelirlerden</small>
+                    </article>
+                    <article>
+                      <span>Toplam hareket</span>
+                      <strong>{selectedAssetDetail.transactions.length}</strong>
+                      <small>Alis, satis, gelir/gider</small>
+                    </article>
+                  </div>
+                  <div className="transaction-story">
+                    {selectedAssetDetail.storyRows.map((row) => (
+                      <div className={`transaction-story-row ${row.tone}`} key={row.tx.id}>
+                        <div className="story-index">{row.index}</div>
+                        <div className="story-main">
+                          <div className="story-title">
+                            <span className={`transaction-type ${row.tx.type}`}>{row.label}</span>
+                            <strong>{row.title}</strong>
+                            <small>{row.tx.date}</small>
+                          </div>
+                          <div className="story-meta">
+                            <span>Tutar <b>{money(row.amount)}</b></span>
+                            {row.tx.price ? <span>Birim <b>{money(row.tx.price, selectedAssetDetail.asset.currency)}</b></span> : null}
+                            {row.tx.fee ? <span>Komisyon <b>{money(row.tx.fee)}</b></span> : null}
+                            {row.remaining !== null ? <span>Kalan <b>{num(row.remaining)} adet</b></span> : null}
+                          </div>
+                          {row.tx.note ? <p>{row.tx.note}</p> : null}
+                        </div>
+                        <div className="story-result">
+                          <span>{row.resultLabel}</span>
+                          <strong className={row.realized >= 0 ? "positive" : "negative"}>{row.resultText}</strong>
+                        </div>
+                        <button className="icon-btn" onClick={() => void deleteTransaction(row.tx.id)} title="Sil">x</button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : <div className="empty">Bu varlik icin henuz islem kaydi yok.</div>}
             </div>
           </section>
         </div>

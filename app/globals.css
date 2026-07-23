@@ -2331,6 +2331,139 @@ th {
   font-size: 12px;
 }
 
+.transaction-story-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.transaction-story-summary article {
+  min-height: 82px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.transaction-story-summary span,
+.story-result span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.transaction-story-summary strong,
+.transaction-story-summary .trend-value {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+.transaction-story-summary small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.transaction-story {
+  display: grid;
+  gap: 10px;
+}
+
+.transaction-story-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(150px, 210px) 36px;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-left: 4px solid #94a3b8;
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 12px;
+}
+
+.transaction-story-row.buy {
+  border-left-color: #2f73f6;
+  background: #f7faff;
+}
+
+.transaction-story-row.positive {
+  border-left-color: var(--green);
+  background: #f5fffb;
+}
+
+.transaction-story-row.negative {
+  border-left-color: var(--red);
+  background: #fff8f7;
+}
+
+.story-index {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #0f1c2a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.story-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.story-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.story-title small,
+.story-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.story-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+}
+
+.story-meta b {
+  color: var(--text);
+}
+
+.story-main p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.story-result {
+  text-align: right;
+}
+
+.story-result strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+.transaction-story-row.buy .story-result strong {
+  color: var(--text);
+}
+
 .transaction-type {
   display: inline-flex;
   justify-content: center;
@@ -2518,13 +2651,19 @@ label {
   .fund-dataset-row,
   .benchmark-grid,
   .source-grid,
+  .transaction-story-summary,
   .transaction-form,
   .transaction-form.position-mode,
   .transaction-form.amount-mode,
   .transaction-row,
+  .transaction-story-row,
   .asset-detail-grid,
   .asset-detail-body {
     grid-template-columns: 1fr;
+  }
+
+  .story-result {
+    text-align: left;
   }
 
   .asset-detail-head {

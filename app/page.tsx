@@ -3307,6 +3307,7 @@ export default function Home() {
                       <td className={pl >= 0 ? "positive" : "negative"}>{money(pl)}</td>
                       <td><span className={pl >= 0 ? "performance-badge positive" : "performance-badge negative"}>{signedPct(plRate)}</span></td>
                       <td className="row-actions">
+                        <button className="icon-btn text-btn transaction-action-btn" onClick={() => openAssetDetail(asset)} title="Islem gecmisini ac">Islem</button>
                         <button className="icon-btn" onClick={() => openAsset(asset)} title="Duzenle">✎</button>
                         <button className="icon-btn" onClick={() => void deleteAsset(asset.id)} title="Sil">×</button>
                       </td>

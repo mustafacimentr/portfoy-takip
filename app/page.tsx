@@ -670,20 +670,26 @@ function summarizeAssetTransactions(asset: Asset, transactions: Transaction[]) {
       const gross = tx.amount || tx.quantity * tx.price;
       if (tx.type === "buy") summary.buyTotal += gross + (tx.fee || 0);
       if (tx.type === "sell") {
+        const costBasis = Number(tx.costBasis || tx.quantity * asset.avgCost || 0);
+        summary.soldCostBasis += costBasis;
         summary.sellTotal += gross - (tx.fee || 0);
         summary.realizedProfit += Number.isFinite(Number(tx.realizedProfit)) && tx.realizedProfit !== 0
           ? Number(tx.realizedProfit)
-          : gross - Number(tx.costBasis || tx.quantity * asset.avgCost) - (tx.fee || 0);
+          : gross - costBasis - (tx.fee || 0);
       }
       if (tx.type === "dividend" || tx.type === "distribution") summary.income += tx.amount || tx.price;
       if (tx.type === "fee" || tx.type === "tax") summary.expense += (tx.amount || tx.price) + (tx.fee || 0);
       if (tx.type === "transfer") summary.transferCount += 1;
       return summary;
-    }, { buyTotal: 0, sellTotal: 0, realizedProfit: 0, income: 0, expense: 0, transferCount: 0 });
+    }, { buyTotal: 0, sellTotal: 0, soldCostBasis: 0, realizedProfit: 0, income: 0, expense: 0, transferCount: 0 });
 }
 
 function realizedNetFromSummary(summary: ReturnType<typeof summarizeAssetTransactions>) {
   return summary.realizedProfit + summary.income - summary.expense;
+}
+
+function historicalPerformanceBase(openCost: number, summary: ReturnType<typeof summarizeAssetTransactions>) {
+  return summary.buyTotal || openCost + summary.soldCostBasis;
 }
 
 function reverseLastTransactionOnAsset(asset: Asset, incoming: Transaction) {
@@ -942,10 +948,15 @@ export default function Home() {
 
   const totals = useMemo(() => {
     const calculated = totalsFromAssets(state.assets);
-    const realized = state.assets.reduce((sum, asset) => sum + realizedNetFromSummary(summarizeAssetTransactions(asset, state.transactions)), 0);
-    const buyTotal = state.assets.reduce((sum, asset) => sum + summarizeAssetTransactions(asset, state.transactions).buyTotal, 0);
-    const pl = calculated.profitLoss + realized;
-    const rateBase = buyTotal || calculated.totalCost;
+    const realizedAndBase = state.assets.reduce((summary, asset) => {
+      const assetCost = asset.quantity * asset.avgCost * (asset.fxRate || 1);
+      const txSummary = summarizeAssetTransactions(asset, state.transactions);
+      summary.realized += realizedNetFromSummary(txSummary);
+      summary.rateBase += historicalPerformanceBase(assetCost, txSummary);
+      return summary;
+    }, { realized: 0, rateBase: 0 });
+    const pl = calculated.profitLoss + realizedAndBase.realized;
+    const rateBase = realizedAndBase.rateBase || calculated.totalCost;
     return { totalValue: calculated.totalValue, totalCost: calculated.totalCost, cash: calculated.cash, pl, rate: rateBase ? (pl / rateBase) * 100 : 0 };
   }, [state.assets, state.transactions]);
 
@@ -1224,7 +1235,7 @@ export default function Home() {
         const transactionSummary = summarizeAssetTransactions(asset, state.transactions);
         const netRealized = realizedNetFromSummary(transactionSummary);
         const totalProfitLoss = value - cost + netRealized;
-        const performanceCost = transactionSummary.buyTotal || cost;
+        const performanceCost = historicalPerformanceBase(cost, transactionSummary);
         const basePrice = dailyBasePrice(asset);
         const baseValue = basePrice > 0 ? asset.quantity * basePrice * (asset.fxRate || 1) : 0;
         const dailyChange = baseValue ? value - baseValue : 0;
@@ -1453,7 +1464,7 @@ export default function Home() {
     const netRealized = realizedNetFromSummary(transactionSummary);
     const openProfitLoss = value - cost;
     const profitLoss = openProfitLoss + netRealized;
-    const returnBase = transactionSummary.buyTotal || cost;
+    const returnBase = historicalPerformanceBase(cost, transactionSummary);
     const returnRate = returnBase ? (profitLoss / returnBase) * 100 : 0;
     const notes = [
       rank > 0 && rank <= 3 ? "Bu varlik portfoyun en buyuk 3 pozisyonundan biri." : "",
@@ -3540,7 +3551,7 @@ export default function Home() {
                   const txSummary = summarizeAssetTransactions(asset, state.transactions);
                   const netRealized = realizedNetFromSummary(txSummary);
                   const pl = value - cost + netRealized;
-                  const plRateBase = txSummary.buyTotal || cost;
+                  const plRateBase = historicalPerformanceBase(cost, txSummary);
                   const plRate = plRateBase ? (pl / plRateBase) * 100 : 0;
                   const previous = filteredAssets[index - 1];
                   const currentGroupKey = assetGroupKey(asset);
@@ -3734,7 +3745,7 @@ export default function Home() {
                     const txSummary = summarizeAssetTransactions(asset, state.transactions);
                     const netRealized = realizedNetFromSummary(txSummary);
                     const pl = value - cost + netRealized;
-                    const plRateBase = txSummary.buyTotal || cost;
+                    const plRateBase = historicalPerformanceBase(cost, txSummary);
                     const plRate = plRateBase ? (pl / plRateBase) * 100 : 0;
                     const previous = filteredAssets[index - 1];
                     const currentGroupKey = assetGroupKey(asset);

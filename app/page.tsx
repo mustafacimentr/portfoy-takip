@@ -908,6 +908,7 @@ export default function Home() {
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
   const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
+  const [quickSellDraft, setQuickSellDraft] = useState({ assetId: "", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
   const [fundSyncStatus, setFundSyncStatus] = useState("");
   const [lastSync, setLastSync] = useState("");
@@ -1248,6 +1249,13 @@ export default function Home() {
       })
       .sort((left, right) => right.value - left.value);
   }, [state.assets, state.transactions, totals.totalValue]);
+
+  const sellableAssets = useMemo(() => {
+    return state.assets
+      .map(normalizeAsset)
+      .filter((asset) => asset.quantity > 0 && asset.type !== "Nakit")
+      .sort((left, right) => left.ticker.localeCompare(right.ticker));
+  }, [state.assets]);
 
   const bestAsset = useMemo(() => {
     return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => right.returnRate - left.returnRate)[0];
@@ -2098,6 +2106,24 @@ export default function Home() {
     setTransactionDraft({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   }
 
+  function openQuickSell(asset?: Asset) {
+    const target = asset || sellableAssets[0];
+    if (!target) {
+      alert("Satilabilecek acik pozisyon yok.");
+      return;
+    }
+    setSelectedAssetId("");
+    setQuickSellDraft({
+      assetId: target.id,
+      quantity: "",
+      price: amountFieldValue(target.price),
+      amount: "",
+      fee: "",
+      date: plainDate(),
+      note: "",
+    });
+  }
+
   function updateDraftTicker(value: string) {
     const details = inferAssetDetails(value);
     setAssetLookup({ loading: false, message: "", ok: false });
@@ -2208,6 +2234,52 @@ export default function Home() {
       transactions: nextTransactions.map((item) => item.assetId === selectedAssetDetail.asset.id ? (rebuiltById.get(item.id) || item) : item),
     });
     setTransactionDraft({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
+  }
+
+  async function submitQuickSell(event: FormEvent) {
+    event.preventDefault();
+    const asset = state.assets.find((item) => item.id === quickSellDraft.assetId);
+    if (!asset) {
+      alert("Satilacak varlik secilemedi.");
+      return;
+    }
+    const amount = parseAmount(quickSellDraft.amount);
+    const price = parseAmount(quickSellDraft.price) || asset.price || asset.avgCost;
+    const quantity = parseAmount(quickSellDraft.quantity) || (amount && price ? amount / price : 0);
+    const tx = normalizeTransaction({
+      id: uid(),
+      assetId: asset.id,
+      date: quickSellDraft.date,
+      type: "sell",
+      quantity,
+      price,
+      amount: amount || quantity * price,
+      fee: parseAmount(quickSellDraft.fee),
+      note: quickSellDraft.note || "Hizli satis",
+    });
+    if (!tx.date || !tx.quantity || !tx.price) {
+      alert("Satis icin tarih, adet ve fiyat bilgisi gerekli.");
+      return;
+    }
+
+    const existingTransactions = state.transactions.map(normalizeTransaction);
+    const nextTransactions = [...existingTransactions, tx];
+    const relatedTransactions = nextTransactions.filter((item) => item.assetId === asset.id);
+    const rebuilt = rebuildAssetFromTransactions(asset, relatedTransactions);
+    const applied = rebuilt.error
+      ? applyTransactionToAsset(asset, tx)
+      : { asset: rebuilt.asset, transaction: tx, error: "" };
+    if (applied.error) {
+      alert(applied.error);
+      return;
+    }
+    const rebuiltById = new Map((rebuilt.error ? relatedTransactions : rebuilt.transactions).map((item) => [item.id, item]));
+    await savePortfolio({
+      ...state,
+      assets: state.assets.map((item) => (item.id === asset.id ? applied.asset : item)),
+      transactions: nextTransactions.map((item) => item.assetId === asset.id ? (rebuiltById.get(item.id) || item) : item),
+    });
+    setQuickSellDraft({ assetId: "", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   }
 
   async function deleteTransaction(id: string) {
@@ -2612,6 +2684,7 @@ export default function Home() {
             <button className="secondary" onClick={printPortfolioReport}>PDF raporu</button>
             <button className="secondary" onClick={exportBackup}>Yedek indir</button>
             <button className="secondary" onClick={() => void mergeDuplicateAssets()} disabled={!duplicateAssetGroups.length}>Tekrarlananlari birlestir{duplicateAssetGroups.length ? ` (${duplicateAssetGroups.length})` : ""}</button>
+            <button className="secondary" onClick={() => openQuickSell()} disabled={!sellableAssets.length}>Varlik sat</button>
             <label className="file-button">
               Yedek yukle
               <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(event) => event.target.files?.[0] && void importBackup(event.target.files[0])} />
@@ -3498,6 +3571,7 @@ export default function Home() {
                       <td><span className={pl >= 0 ? "performance-badge positive" : "performance-badge negative"}>{signedPct(plRate)}</span></td>
                       <td className="row-actions">
                         <button className="icon-btn text-btn transaction-action-btn" onClick={() => openAssetDetail(asset)} title="Islem gecmisini ac">Islem</button>
+                        {asset.quantity > 0 && asset.type !== "Nakit" ? <button className="icon-btn text-btn transaction-action-btn" onClick={() => openQuickSell(asset)} title="Varlik sat">Sat</button> : null}
                         <button className="icon-btn" onClick={() => openAsset(asset)} title="Duzenle">✎</button>
                         <button className="icon-btn" onClick={() => void deleteAsset(asset.id)} title="Sil">×</button>
                       </td>
@@ -3938,6 +4012,63 @@ export default function Home() {
             <div className="modal-footer">
               <button type="button" className="secondary" onClick={() => setAssetDraft(null)}>Vazgec</button>
               <button className="primary">Kaydet</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {quickSellDraft.assetId ? (
+        <div className="modal-backdrop">
+          <form className="modal" onSubmit={(event) => void submitQuickSell(event)}>
+            <div className="panel-header"><h2>Varlik sat</h2></div>
+            <div className="form-grid">
+              <label className="wide">Varlik
+                <select className="input" value={quickSellDraft.assetId} onChange={(event) => {
+                  const asset = state.assets.find((item) => item.id === event.target.value);
+                  setQuickSellDraft({
+                    ...quickSellDraft,
+                    assetId: event.target.value,
+                    price: asset ? amountFieldValue(asset.price) : quickSellDraft.price,
+                    amount: "",
+                  });
+                }}>
+                  {sellableAssets.map((asset) => (
+                    <option key={asset.id} value={asset.id}>{asset.ticker} - {num(asset.quantity)} adet</option>
+                  ))}
+                </select>
+              </label>
+              {state.assets.find((item) => item.id === quickSellDraft.assetId) ? (
+                <div className="auto-summary asset-match">
+                  {(() => {
+                    const asset = state.assets.find((item) => item.id === quickSellDraft.assetId);
+                    if (!asset) return null;
+                    return <><AssetLogo asset={asset} color={groupColors[assetGroupKey(asset)] || "#647181"} small /><span><strong>{asset.ticker}</strong><small>Mevcut adet: {num(asset.quantity)} · Ortalama maliyet: {money(asset.avgCost, asset.currency)}</small></span></>;
+                  })()}
+                </div>
+              ) : null}
+              <label>Tarih
+                <input className="input" type="date" value={quickSellDraft.date} onChange={(event) => setQuickSellDraft({ ...quickSellDraft, date: event.target.value })} required />
+              </label>
+              <label>Satilacak adet
+                <input className="input" inputMode="decimal" value={quickSellDraft.quantity} onChange={(event) => setQuickSellDraft({ ...quickSellDraft, quantity: event.target.value })} required />
+              </label>
+              <label>Birim satis fiyati
+                <input className="input" inputMode="decimal" value={quickSellDraft.price} onChange={(event) => setQuickSellDraft({ ...quickSellDraft, price: event.target.value })} required />
+              </label>
+              <label>Toplam satis tutari
+                <input className="input" inputMode="decimal" value={quickSellDraft.amount} onChange={(event) => setQuickSellDraft({ ...quickSellDraft, amount: event.target.value })} placeholder="Istege bagli" />
+              </label>
+              <label>Komisyon
+                <input className="input" inputMode="decimal" value={quickSellDraft.fee} onChange={(event) => setQuickSellDraft({ ...quickSellDraft, fee: event.target.value })} placeholder="Istege bagli" />
+              </label>
+              <label>Not
+                <input className="input" value={quickSellDraft.note} onChange={(event) => setQuickSellDraft({ ...quickSellDraft, note: event.target.value })} placeholder="Istege bagli" />
+              </label>
+              <div className="auto-summary wide">Tahmini satis: <strong>{money(parseAmount(quickSellDraft.amount) || parseAmount(quickSellDraft.quantity) * parseAmount(quickSellDraft.price))}</strong></div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="secondary" onClick={() => setQuickSellDraft({ assetId: "", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" })}>Vazgec</button>
+              <button className="primary">Satisi isle</button>
             </div>
           </form>
         </div>

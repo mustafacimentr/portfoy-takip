@@ -2261,6 +2261,10 @@ export default function Home() {
       alert("Satis icin tarih, adet ve fiyat bilgisi gerekli.");
       return;
     }
+    if (tx.quantity > Number(asset.quantity || 0) + 0.00000001) {
+      alert(`Satmak istedigin adet mevcut adetten fazla. Mevcut adet: ${num(asset.quantity)}`);
+      return;
+    }
 
     const existingTransactions = state.transactions.map(normalizeTransaction);
     const nextTransactions = [...existingTransactions, tx];
@@ -2274,12 +2278,15 @@ export default function Home() {
       return;
     }
     const rebuiltById = new Map((rebuilt.error ? relatedTransactions : rebuilt.transactions).map((item) => [item.id, item]));
+    const nextAsset = applied.asset;
     await savePortfolio({
       ...state,
-      assets: state.assets.map((item) => (item.id === asset.id ? applied.asset : item)),
+      assets: state.assets.map((item) => (item.id === asset.id ? nextAsset : item)),
       transactions: nextTransactions.map((item) => item.assetId === asset.id ? (rebuiltById.get(item.id) || item) : item),
     });
     setQuickSellDraft({ assetId: "", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
+    setSelectedAssetId(asset.id);
+    alert(`Satis kaydedildi. Kalan adet: ${num(nextAsset.quantity)}`);
   }
 
   async function deleteTransaction(id: string) {
@@ -4086,6 +4093,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="row-actions">
+                {selectedAssetDetail.asset.quantity > 0 && selectedAssetDetail.asset.type !== "Nakit" ? <button className="secondary" onClick={() => openQuickSell(selectedAssetDetail.asset)}>Sat</button> : null}
                 <button className="secondary" onClick={() => openAsset(selectedAssetDetail.asset)}>Duzenle</button>
                 <button className="secondary" onClick={() => setSelectedAssetId("")}>Kapat</button>
               </div>

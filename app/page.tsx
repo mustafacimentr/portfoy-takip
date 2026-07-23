@@ -31,6 +31,9 @@ type Asset = {
 type Transaction = {
   id: string;
   assetId: string;
+  assetTicker?: string;
+  assetName?: string;
+  assetSymbol?: string;
   date: string;
   type: string;
   quantity: number;
@@ -565,6 +568,9 @@ function normalizeTransaction(tx: Partial<Transaction>): Transaction {
   return {
     id: tx.id || uid(),
     assetId: String(tx.assetId || ""),
+    assetTicker: tx.assetTicker ? String(tx.assetTicker) : undefined,
+    assetName: tx.assetName ? String(tx.assetName) : undefined,
+    assetSymbol: tx.assetSymbol ? String(tx.assetSymbol) : undefined,
     date: tx.date || plainDate(),
     type: String(tx.type || "buy"),
     quantity: Number(tx.quantity || 0),
@@ -691,6 +697,16 @@ function realizedNetFromSummary(summary: ReturnType<typeof summarizeAssetTransac
 
 function historicalPerformanceBase(openCost: number, summary: ReturnType<typeof summarizeAssetTransactions>) {
   return summary.buyTotal || openCost + summary.soldCostBasis;
+}
+
+function transactionWithAssetIdentity(tx: Partial<Transaction>, asset: Asset): Partial<Transaction> {
+  return {
+    ...tx,
+    assetId: asset.id,
+    assetTicker: asset.ticker,
+    assetName: asset.name,
+    assetSymbol: asset.priceSymbol || asset.ticker,
+  };
 }
 
 function reverseLastTransactionOnAsset(asset: Asset, incoming: Transaction) {
@@ -1726,11 +1742,22 @@ export default function Home() {
   ] as const;
   const reportTransactionRows = useMemo(() => {
     const assetsById = new Map(state.assets.map((asset) => [asset.id, asset]));
+    const assetsByCode = new Map<string, Asset>();
+    state.assets.forEach((asset) => {
+      [asset.ticker, asset.priceSymbol, asset.name].map(compactCode).filter(Boolean).forEach((code) => assetsByCode.set(code, asset));
+    });
     return state.transactions
       .map(normalizeTransaction)
       .filter((tx) => ["buy", "sell", "dividend", "distribution", "fee", "tax"].includes(tx.type))
       .map((tx) => {
-        const asset = assetsById.get(tx.assetId);
+        const asset = assetsById.get(tx.assetId)
+          || assetsByCode.get(compactCode(tx.assetTicker || tx.assetSymbol || tx.assetName || ""))
+          || (isPositionTransaction(tx.type) && tx.price
+            ? state.assets
+              .map((item) => ({ asset: item, diff: Math.abs(Number(item.price || 0) - tx.price) }))
+              .filter((item) => item.asset.price > 0 && item.diff <= Math.max(0.05, tx.price * 0.0025))
+              .sort((left, right) => left.diff - right.diff)[0]?.asset
+            : undefined);
         const amount = tx.amount || tx.quantity * tx.price || tx.price;
         const saleCostBasis = tx.type === "sell"
           ? Number(tx.costBasis || tx.quantity * (tx.resultingAvgCost || asset?.avgCost || 0) || 0)
@@ -1956,12 +1983,29 @@ export default function Home() {
     }
     const exists = state.assets.some((item) => item.id === asset.id);
     const duplicate = !exists ? state.assets.find((item) => assetMergeKey(item) === assetMergeKey(asset)) : null;
+    const mergedDuplicate = duplicate ? { ...mergeAssetCluster([duplicate, asset]), id: duplicate.id } : null;
     const assets = exists
       ? state.assets.map((item) => (item.id === asset.id ? asset : item))
-      : duplicate
-        ? state.assets.map((item) => (item.id === duplicate.id ? mergeAssetCluster([item, asset]) : item))
+      : duplicate && mergedDuplicate
+        ? state.assets.map((item) => (item.id === duplicate.id ? mergedDuplicate : item))
         : [...state.assets, asset];
-    await savePortfolio({ ...state, assets });
+    const targetAsset = duplicate && mergedDuplicate ? mergedDuplicate : asset;
+    const shouldCreateInitialBuy = !exists && netQuantity > 0 && priceCost > 0;
+    const buyTransaction = shouldCreateInitialBuy ? normalizeTransaction(transactionWithAssetIdentity({
+      id: uid(),
+      date: plainDate(),
+      type: "buy",
+      quantity: netQuantity,
+      price: priceCost,
+      amount: grossQuantity * priceCost,
+      fee: cashFee,
+      costBasis: totalCost,
+      realizedProfit: 0,
+      resultingQuantity: targetAsset.quantity,
+      resultingAvgCost: targetAsset.avgCost,
+      note: duplicate ? "Mevcut pozisyona ek alis" : "Ilk varlik kaydi",
+    }, targetAsset)) : null;
+    await savePortfolio({ ...state, assets, transactions: buyTransaction ? [...state.transactions.map(normalizeTransaction), buyTransaction] : state.transactions });
     setAssetDraft(null);
   }
 
@@ -2244,9 +2288,8 @@ export default function Home() {
     const amount = parseAmount(transactionDraft.amount);
     const price = parseAmount(transactionDraft.price) || (!isPositionTrade ? amount : selectedAssetDetail.asset.price || selectedAssetDetail.asset.avgCost);
     const quantity = parseAmount(transactionDraft.quantity) || (amount && price ? amount / price : 0);
-    const tx = normalizeTransaction({
+    const tx = normalizeTransaction(transactionWithAssetIdentity({
       id: uid(),
-      assetId: selectedAssetDetail.asset.id,
       date: transactionDraft.date,
       type: transactionDraft.type,
       quantity,
@@ -2254,7 +2297,7 @@ export default function Home() {
       amount: amount || quantity * price,
       fee: parseAmount(transactionDraft.fee),
       note: transactionDraft.note,
-    });
+    }, selectedAssetDetail.asset));
     if (!tx.date || (isPositionTrade && (!tx.quantity || !tx.price)) || (!isPositionTrade && !tx.price)) {
       alert("Islem icin tarih ve tutar bilgisi gerekli.");
       return;
@@ -2275,7 +2318,8 @@ export default function Home() {
       alert(applied.error);
       return;
     }
-    const rebuiltById = new Map((rebuilt.error ? relatedTransactions : rebuilt.transactions).map((item) => [item.id, item]));
+    const persistedTransactions = rebuilt.error ? relatedTransactions.map((item) => (item.id === tx.id ? applied.transaction : item)) : rebuilt.transactions;
+    const rebuiltById = new Map(persistedTransactions.map((item) => [item.id, item]));
     await savePortfolio({
       ...state,
       assets: state.assets.map((asset) => (asset.id === selectedAssetDetail.asset.id ? applied.asset : asset)),
@@ -2294,9 +2338,8 @@ export default function Home() {
     const amount = parseAmount(quickSellDraft.amount);
     const price = parseAmount(quickSellDraft.price) || asset.price || asset.avgCost;
     const quantity = parseAmount(quickSellDraft.quantity) || (amount && price ? amount / price : 0);
-    const tx = normalizeTransaction({
+    const tx = normalizeTransaction(transactionWithAssetIdentity({
       id: uid(),
-      assetId: asset.id,
       date: quickSellDraft.date,
       type: "sell",
       quantity,
@@ -2304,7 +2347,7 @@ export default function Home() {
       amount: amount || quantity * price,
       fee: parseAmount(quickSellDraft.fee),
       note: quickSellDraft.note || "Hizli satis",
-    });
+    }, asset));
     if (!tx.date || !tx.quantity || !tx.price) {
       alert("Satis icin tarih, adet ve fiyat bilgisi gerekli.");
       return;
@@ -2325,7 +2368,8 @@ export default function Home() {
       alert(applied.error);
       return;
     }
-    const rebuiltById = new Map((rebuilt.error ? relatedTransactions : rebuilt.transactions).map((item) => [item.id, item]));
+    const persistedTransactions = rebuilt.error ? relatedTransactions.map((item) => (item.id === tx.id ? applied.transaction : item)) : rebuilt.transactions;
+    const rebuiltById = new Map(persistedTransactions.map((item) => [item.id, item]));
     const nextAsset = applied.asset;
     await savePortfolio({
       ...state,
@@ -3838,7 +3882,7 @@ export default function Home() {
                         <td>
                           <span className="report-asset-cell">
                             {row.asset ? <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small /> : null}
-                            <span><strong>{row.asset?.ticker || "-"}</strong><small>{row.asset?.name || row.tx.note || "-"}</small></span>
+                            <span><strong>{row.asset?.ticker || row.tx.assetTicker || row.tx.assetSymbol || "-"}</strong><small>{row.asset?.name || row.tx.assetName || row.tx.note || "-"}</small></span>
                           </span>
                         </td>
                         <td><span className={`transaction-report-type ${row.tx.type}`}>{row.typeLabel}</span></td>

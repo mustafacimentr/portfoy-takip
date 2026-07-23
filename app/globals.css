@@ -2285,9 +2285,16 @@ th {
 
 .transaction-form {
   display: grid;
-  grid-template-columns: 120px 150px repeat(4, minmax(0, 1fr)) 80px;
+  grid-template-columns: 110px 140px repeat(5, minmax(0, 1fr)) 80px;
   gap: 8px;
   align-items: center;
+}
+
+.transaction-hint {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .transaction-list {

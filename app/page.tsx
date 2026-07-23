@@ -35,7 +35,12 @@ type Transaction = {
   type: string;
   quantity: number;
   price: number;
+  amount?: number;
   fee?: number;
+  costBasis?: number;
+  realizedProfit?: number;
+  resultingQuantity?: number;
+  resultingAvgCost?: number;
   note: string;
 };
 
@@ -549,9 +554,99 @@ function normalizeTransaction(tx: Partial<Transaction>): Transaction {
     type: String(tx.type || "buy"),
     quantity: Number(tx.quantity || 0),
     price: Number(tx.price || 0),
+    amount: Number(tx.amount || 0),
     fee: Number(tx.fee || 0),
+    costBasis: Number(tx.costBasis || 0),
+    realizedProfit: Number(tx.realizedProfit || 0),
+    resultingQuantity: Number(tx.resultingQuantity || 0),
+    resultingAvgCost: Number(tx.resultingAvgCost || 0),
     note: String(tx.note || ""),
   };
+}
+
+function applyTransactionToAsset(asset: Asset, incoming: Transaction) {
+  const tx = normalizeTransaction(incoming);
+  const fee = Math.max(0, Number(tx.fee || 0));
+  const amount = Number(tx.amount || tx.quantity * tx.price || 0);
+  const quantity = Number(tx.quantity || (tx.price ? amount / tx.price : 0));
+  const currentQuantity = Number(asset.quantity || 0);
+  const currentAvgCost = Number(asset.avgCost || 0);
+  let nextAsset = { ...asset };
+  let nextTx = { ...tx, quantity, amount, fee };
+
+  if (tx.type === "buy") {
+    if (quantity <= 0 || amount <= 0) return { asset, transaction: nextTx, error: "Alis icin adet ve tutar bilgisi gerekli." };
+    const currentCost = currentQuantity * currentAvgCost;
+    const nextQuantity = currentQuantity + quantity;
+    const nextCost = currentCost + amount + fee;
+    const nextAvgCost = nextQuantity ? nextCost / nextQuantity : 0;
+    nextAsset = {
+      ...asset,
+      quantity: nextQuantity,
+      avgCost: nextAvgCost,
+      price: asset.price || tx.price,
+    };
+    nextTx = {
+      ...nextTx,
+      costBasis: amount + fee,
+      realizedProfit: 0,
+      resultingQuantity: nextQuantity,
+      resultingAvgCost: nextAvgCost,
+    };
+  }
+
+  if (tx.type === "sell") {
+    if (quantity <= 0 || amount <= 0) return { asset, transaction: nextTx, error: "Satis icin adet ve tutar bilgisi gerekli." };
+    if (quantity > currentQuantity + 0.00000001) return { asset, transaction: nextTx, error: "Satmak istedigin adet mevcut adetten fazla." };
+    const costBasis = quantity * currentAvgCost;
+    const realizedProfit = amount - fee - costBasis;
+    const nextQuantity = Math.max(0, currentQuantity - quantity);
+    const nextAvgCost = nextQuantity > 0.00000001 ? currentAvgCost : 0;
+    nextAsset = {
+      ...asset,
+      quantity: nextQuantity,
+      avgCost: nextAvgCost,
+    };
+    nextTx = {
+      ...nextTx,
+      costBasis,
+      realizedProfit,
+      resultingQuantity: nextQuantity,
+      resultingAvgCost: nextAvgCost,
+    };
+  }
+
+  return { asset: normalizeAsset(nextAsset), transaction: normalizeTransaction(nextTx), error: "" };
+}
+
+function reverseLastTransactionOnAsset(asset: Asset, incoming: Transaction) {
+  const tx = normalizeTransaction(incoming);
+  const amount = Number(tx.amount || tx.quantity * tx.price || 0);
+  const fee = Number(tx.fee || 0);
+  let nextAsset = { ...asset };
+
+  if (tx.type === "buy") {
+    const nextQuantity = Math.max(0, Number(asset.quantity || 0) - Number(tx.quantity || 0));
+    const currentCost = Number(asset.quantity || 0) * Number(asset.avgCost || 0);
+    const previousCost = Math.max(0, currentCost - amount - fee);
+    nextAsset = {
+      ...asset,
+      quantity: nextQuantity,
+      avgCost: nextQuantity ? previousCost / nextQuantity : 0,
+    };
+  }
+
+  if (tx.type === "sell") {
+    const restoredQuantity = Number(asset.quantity || 0) + Number(tx.quantity || 0);
+    const restoredAvgCost = tx.costBasis && tx.quantity ? tx.costBasis / tx.quantity : Number(asset.avgCost || tx.resultingAvgCost || 0);
+    nextAsset = {
+      ...asset,
+      quantity: restoredQuantity,
+      avgCost: restoredAvgCost,
+    };
+  }
+
+  return normalizeAsset(nextAsset);
 }
 
 function normalizeSettings(settings?: Partial<PortfolioSettings> & { autoRefresh?: boolean }): PortfolioSettings {
@@ -709,7 +804,7 @@ export default function Home() {
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [cashDraft, setCashDraft] = useState({ type: "deposit" as CashFlow["type"], amount: "", date: plainDate(), note: "" });
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
-  const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
+  const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
   const [fundSyncStatus, setFundSyncStatus] = useState("");
   const [lastSync, setLastSync] = useState("");
@@ -1217,14 +1312,16 @@ export default function Home() {
       .filter((tx) => tx.assetId === asset.id)
       .sort((left, right) => right.date.localeCompare(left.date));
     const transactionSummary = transactions.reduce((summary, tx) => {
-      const gross = tx.quantity * tx.price;
+      const gross = tx.amount || tx.quantity * tx.price;
       if (tx.type === "buy") summary.buyTotal += gross + (tx.fee || 0);
       if (tx.type === "sell") {
         summary.sellTotal += gross - (tx.fee || 0);
-        summary.realizedProfit += gross - tx.quantity * asset.avgCost - (tx.fee || 0);
+        summary.realizedProfit += Number.isFinite(Number(tx.realizedProfit)) && tx.realizedProfit !== 0
+          ? Number(tx.realizedProfit)
+          : gross - Number(tx.costBasis || tx.quantity * asset.avgCost) - (tx.fee || 0);
       }
-      if (tx.type === "dividend" || tx.type === "distribution") summary.income += tx.price;
-      if (tx.type === "fee" || tx.type === "tax") summary.expense += tx.price + (tx.fee || 0);
+      if (tx.type === "dividend" || tx.type === "distribution") summary.income += tx.amount || tx.price;
+      if (tx.type === "fee" || tx.type === "tax") summary.expense += (tx.amount || tx.price) + (tx.fee || 0);
       if (tx.type === "transfer") summary.transferCount += 1;
       return summary;
     }, { buyTotal: 0, sellTotal: 0, realizedProfit: 0, income: 0, expense: 0, transferCount: 0 });
@@ -1862,7 +1959,7 @@ export default function Home() {
 
   function openAssetDetail(asset: Asset) {
     setSelectedAssetId(asset.id);
-    setTransactionDraft({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
+    setTransactionDraft({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   }
 
   function updateDraftTicker(value: string) {
@@ -1902,26 +1999,50 @@ export default function Home() {
   async function submitTransaction(event: FormEvent) {
     event.preventDefault();
     if (!selectedAssetDetail) return;
+    const isPositionTrade = transactionDraft.type === "buy" || transactionDraft.type === "sell";
+    const amount = parseAmount(transactionDraft.amount);
+    const price = parseAmount(transactionDraft.price) || (!isPositionTrade ? amount : selectedAssetDetail.asset.price || selectedAssetDetail.asset.avgCost);
+    const quantity = parseAmount(transactionDraft.quantity) || (amount && price ? amount / price : 0);
     const tx = normalizeTransaction({
       id: uid(),
       assetId: selectedAssetDetail.asset.id,
       date: transactionDraft.date,
       type: transactionDraft.type,
-      quantity: parseAmount(transactionDraft.quantity),
-      price: parseAmount(transactionDraft.price),
+      quantity,
+      price,
+      amount: amount || quantity * price,
       fee: parseAmount(transactionDraft.fee),
       note: transactionDraft.note,
     });
-    if (!tx.date || (!tx.quantity && !tx.price)) {
+    if (!tx.date || (isPositionTrade && (!tx.quantity || !tx.price)) || (!isPositionTrade && !tx.price)) {
       alert("Islem icin tarih ve tutar bilgisi gerekli.");
       return;
     }
-    await savePortfolio({ ...state, transactions: [...state.transactions.map(normalizeTransaction), tx] });
-    setTransactionDraft({ type: "buy", quantity: "", price: "", fee: "", date: plainDate(), note: "" });
+    const applied = isPositionTrade ? applyTransactionToAsset(selectedAssetDetail.asset, tx) : { asset: selectedAssetDetail.asset, transaction: tx, error: "" };
+    if (applied.error) {
+      alert(applied.error);
+      return;
+    }
+    await savePortfolio({
+      ...state,
+      assets: state.assets.map((asset) => (asset.id === selectedAssetDetail.asset.id ? applied.asset : asset)),
+      transactions: [...state.transactions.map(normalizeTransaction), applied.transaction],
+    });
+    setTransactionDraft({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   }
 
   async function deleteTransaction(id: string) {
-    await savePortfolio({ ...state, transactions: state.transactions.map(normalizeTransaction).filter((tx) => tx.id !== id) }, { snapshot: false });
+    const transactions = state.transactions.map(normalizeTransaction);
+    const tx = transactions.find((item) => item.id === id);
+    if (!tx) return;
+    const assetTransactions = transactions.filter((item) => item.assetId === tx.assetId);
+    const lastAssetTransaction = assetTransactions[assetTransactions.length - 1];
+    if (lastAssetTransaction?.id !== id) {
+      alert("Maliyet hesabinin bozulmamasi icin sadece ilgili varligin son islemi geri alinabilir.");
+      return;
+    }
+    const assets = state.assets.map((asset) => (asset.id === tx.assetId ? reverseLastTransactionOnAsset(asset, tx) : asset));
+    await savePortfolio({ ...state, assets, transactions: transactions.filter((item) => item.id !== id) }, { snapshot: false });
   }
 
   async function importBackup(file: File) {
@@ -3683,19 +3804,21 @@ export default function Home() {
                 <input className="input" type="date" value={transactionDraft.date} onChange={(event) => setTransactionDraft({ ...transactionDraft, date: event.target.value })} />
                 <input className="input" value={transactionDraft.quantity} onChange={(event) => setTransactionDraft({ ...transactionDraft, quantity: event.target.value })} placeholder="Adet" />
                 <input className="input" value={transactionDraft.price} onChange={(event) => setTransactionDraft({ ...transactionDraft, price: event.target.value })} placeholder={["dividend", "distribution", "fee", "tax"].includes(transactionDraft.type) ? "Tutar" : "Fiyat"} />
+                <input className="input" value={transactionDraft.amount} onChange={(event) => setTransactionDraft({ ...transactionDraft, amount: event.target.value })} placeholder={transactionDraft.type === "sell" ? "Satis tutari" : transactionDraft.type === "buy" ? "Alis tutari" : "Toplam tutar"} />
                 <input className="input" value={transactionDraft.fee} onChange={(event) => setTransactionDraft({ ...transactionDraft, fee: event.target.value })} placeholder="Komisyon" />
                 <input className="input" value={transactionDraft.note} onChange={(event) => setTransactionDraft({ ...transactionDraft, note: event.target.value })} placeholder="Not" />
                 <button className="primary">Ekle</button>
               </form>
+              <p className="transaction-hint">Alis ve satislarda adet ya da toplam tutar girebilirsin. Toplam tutar girersen sistem fiyat uzerinden adedi hesaplar; satislarda kalan adet ve gerceklesmis kar otomatik islenir.</p>
               <div className="transaction-list">
                 {selectedAssetDetail.transactions.length ? selectedAssetDetail.transactions.map((tx) => {
                   const label = tx.type === "buy" ? "Alis" : tx.type === "sell" ? "Satis" : tx.type === "dividend" ? "Temettu" : tx.type === "distribution" ? "Fon dagitimi" : tx.type === "fee" ? "Komisyon" : tx.type === "tax" ? "Vergi" : "Transfer";
-                  const amount = tx.type === "buy" || tx.type === "sell" ? tx.quantity * tx.price : tx.price;
+                  const amount = tx.amount || (tx.type === "buy" || tx.type === "sell" ? tx.quantity * tx.price : tx.price);
                   return (
                     <div className="transaction-row" key={tx.id}>
                       <span className={`transaction-type ${tx.type}`}>{label}</span>
                       <strong>{money(amount)}</strong>
-                      <small>{tx.date} · {tx.quantity ? `${num(tx.quantity)} adet` : "Tutar kaydi"}{tx.fee ? ` · Komisyon ${money(tx.fee)}` : ""}{tx.note ? ` · ${tx.note}` : ""}</small>
+                      <small>{tx.date} - {tx.quantity ? `${num(tx.quantity)} adet` : "Tutar kaydi"}{tx.fee ? ` - Komisyon ${money(tx.fee)}` : ""}{tx.type === "sell" ? ` - Gerceklesen ${signedMoney(tx.realizedProfit || 0)}` : ""}{tx.type === "buy" || tx.type === "sell" ? ` - Kalan ${num(tx.resultingQuantity || 0)} adet` : ""}{tx.note ? ` - ${tx.note}` : ""}</small>
                       <button className="icon-btn" onClick={() => void deleteTransaction(tx.id)} title="Sil">x</button>
                     </div>
                   );

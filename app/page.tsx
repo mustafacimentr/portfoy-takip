@@ -836,6 +836,42 @@ function assetGroupIndex(asset: Asset) {
   return index >= 0 ? index : groupDefinitions.length - 1;
 }
 
+function assetMergeKey(asset: Asset) {
+  return compactCode(asset.ticker || asset.priceSymbol || asset.name);
+}
+
+function mergeAssetCluster(assets: Asset[]) {
+  const normalized = assets.map(normalizeAsset);
+  const primary = normalized
+    .slice()
+    .sort((left, right) => {
+      const byDate = String(right.lastPriceAt || "").localeCompare(String(left.lastPriceAt || ""));
+      if (byDate) return byDate;
+      return (right.quantity * right.price) - (left.quantity * left.price);
+    })[0] || normalizeAsset({});
+  const quantity = normalized.reduce((sum, asset) => sum + Number(asset.quantity || 0), 0);
+  const totalCost = normalized.reduce((sum, asset) => sum + Number(asset.quantity || 0) * Number(asset.avgCost || 0), 0);
+  const bestPriceAsset = normalized.find((asset) => Number(asset.price || 0) > 0) || primary;
+  const notes = normalized.map((asset) => asset.note).filter(Boolean);
+
+  return normalizeAsset({
+    ...primary,
+    id: primary.id,
+    quantity,
+    avgCost: quantity ? totalCost / quantity : Number(primary.avgCost || 0),
+    price: Number(bestPriceAsset.price || primary.price || 0),
+    target: Math.max(...normalized.map((asset) => Number(asset.target || 0)), 0),
+    note: Array.from(new Set(notes)).join(" | "),
+    lastPriceAt: bestPriceAsset.lastPriceAt || primary.lastPriceAt,
+    lastPriceError: bestPriceAsset.lastPriceError || primary.lastPriceError,
+    previousPrice: bestPriceAsset.previousPrice ?? primary.previousPrice,
+    previousPriceAt: bestPriceAsset.previousPriceAt || primary.previousPriceAt,
+    dayOpenPrice: bestPriceAsset.dayOpenPrice ?? primary.dayOpenPrice,
+    dayOpenDate: bestPriceAsset.dayOpenDate || primary.dayOpenDate,
+    logoUrl: bestPriceAsset.logoUrl || primary.logoUrl,
+  });
+}
+
 async function api<T>(path: string, passcode: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -1089,6 +1125,18 @@ export default function Home() {
       })
       .filter((group) => group.assets.length > 0);
   }, [filteredAssets, state.transactions]);
+
+  const duplicateAssetGroups = useMemo(() => {
+    const clusters = new Map<string, Asset[]>();
+    state.assets.map(normalizeAsset).forEach((asset) => {
+      const key = assetMergeKey(asset);
+      if (!key) return;
+      clusters.set(key, [...(clusters.get(key) || []), asset]);
+    });
+    return Array.from(clusters.entries())
+      .map(([key, assets]) => ({ key, assets }))
+      .filter((group) => group.assets.length > 1);
+  }, [state.assets]);
 
   const targetRows = useMemo(() => {
     const targets = normalizeSettings(state.settings).targetAllocations;
@@ -1851,7 +1899,12 @@ export default function Home() {
       }
     }
     const exists = state.assets.some((item) => item.id === asset.id);
-    const assets = exists ? state.assets.map((item) => (item.id === asset.id ? asset : item)) : [...state.assets, asset];
+    const duplicate = !exists ? state.assets.find((item) => assetMergeKey(item) === assetMergeKey(asset)) : null;
+    const assets = exists
+      ? state.assets.map((item) => (item.id === asset.id ? asset : item))
+      : duplicate
+        ? state.assets.map((item) => (item.id === duplicate.id ? mergeAssetCluster([item, asset]) : item))
+        : [...state.assets, asset];
     await savePortfolio({ ...state, assets });
     setAssetDraft(null);
   }
@@ -2077,6 +2130,37 @@ export default function Home() {
       transactions: state.transactions.filter((tx) => tx.assetId !== id),
     });
     if (selectedAssetId === id) setSelectedAssetId("");
+  }
+
+  async function mergeDuplicateAssets() {
+    if (!duplicateAssetGroups.length) {
+      alert("Birleştirilecek tekrar eden varlık yok.");
+      return;
+    }
+    const summary = duplicateAssetGroups.map((group) => {
+      const ticker = group.assets[0]?.ticker || group.key;
+      return `${ticker}: ${group.assets.length} satir`;
+    }).join("\n");
+    if (!confirm(`Ayni kodlu varliklar tek satirda birlestirilecek:\n\n${summary}\n\nDevam edilsin mi?`)) return;
+
+    const duplicateIds = new Set(duplicateAssetGroups.flatMap((group) => group.assets.map((asset) => asset.id)));
+    const mergedAssets = duplicateAssetGroups.map((group) => mergeAssetCluster(group.assets));
+    const idMap = new Map<string, string>();
+    duplicateAssetGroups.forEach((group, index) => {
+      const targetId = mergedAssets[index].id;
+      group.assets.forEach((asset) => idMap.set(asset.id, targetId));
+    });
+    const untouchedAssets = state.assets.filter((asset) => !duplicateIds.has(asset.id));
+    const transactions = state.transactions.map((tx) => normalizeTransaction({
+      ...tx,
+      assetId: idMap.get(tx.assetId) || tx.assetId,
+    }));
+
+    await savePortfolio({
+      ...state,
+      assets: [...untouchedAssets, ...mergedAssets],
+      transactions,
+    });
   }
 
   async function submitTransaction(event: FormEvent) {
@@ -2527,6 +2611,7 @@ export default function Home() {
             </button>
             <button className="secondary" onClick={printPortfolioReport}>PDF raporu</button>
             <button className="secondary" onClick={exportBackup}>Yedek indir</button>
+            <button className="secondary" onClick={() => void mergeDuplicateAssets()} disabled={!duplicateAssetGroups.length}>Tekrarlananlari birlestir{duplicateAssetGroups.length ? ` (${duplicateAssetGroups.length})` : ""}</button>
             <label className="file-button">
               Yedek yukle
               <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(event) => event.target.files?.[0] && void importBackup(event.target.files[0])} />
@@ -3358,6 +3443,7 @@ export default function Home() {
                 <option value="all">Tum turler</option>
                 {types.map((type) => <option key={type}>{type}</option>)}
               </select>
+              {duplicateAssetGroups.length ? <button className="secondary" onClick={() => void mergeDuplicateAssets()}>Tekrarlananlari birlestir</button> : null}
             </div>
           </div>
           <div className="table-scroll">

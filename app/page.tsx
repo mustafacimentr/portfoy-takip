@@ -325,6 +325,7 @@ const cryptoLogoUrls: Record<string, string> = {
   NEAR: "https://assets.coingecko.com/coins/images/10365/small/near.jpg",
 };
 const directAssetLogoUrls: Record<string, string> = {
+  FROTO: "https://companieslogo.com/img/orig/FROTO.IS-0beb2e34.png?t=1720244491",
   ULKER: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/%C3%9Clker_logo_%282%29.svg/250px-%C3%9Clker_logo_%282%29.svg.png",
 };
 const assetLogoDomains: Record<string, string> = {
@@ -1731,12 +1732,17 @@ export default function Home() {
       .map((tx) => {
         const asset = assetsById.get(tx.assetId);
         const amount = tx.amount || tx.quantity * tx.price || tx.price;
+        const saleCostBasis = tx.type === "sell"
+          ? Number(tx.costBasis || tx.quantity * (tx.resultingAvgCost || asset?.avgCost || 0) || 0)
+          : 0;
         const realized = tx.type === "sell"
-          ? Number(tx.realizedProfit || 0)
+          ? (Number.isFinite(Number(tx.realizedProfit)) && tx.realizedProfit !== 0
+            ? Number(tx.realizedProfit)
+            : amount - saleCostBasis - (tx.fee || 0))
           : tx.type === "dividend" || tx.type === "distribution"
             ? amount
             : -Math.abs(amount + (tx.fee || 0));
-        const rateBase = tx.type === "sell" ? Number(tx.costBasis || 0) : 0;
+        const rateBase = tx.type === "sell" ? saleCostBasis : 0;
         const rate = rateBase ? (realized / rateBase) * 100 : 0;
         const typeLabel = tx.type === "sell"
           ? "Satis"
@@ -1754,7 +1760,7 @@ export default function Home() {
           amount,
           realized,
           rate,
-          remaining: tx.resultingQuantity,
+          remaining: tx.type === "sell" ? (tx.resultingQuantity || asset?.quantity || 0) : 0,
           status: realized >= 0 ? "positive" : "negative",
         };
       })

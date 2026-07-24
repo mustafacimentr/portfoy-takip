@@ -2464,6 +2464,89 @@ th {
   color: var(--text);
 }
 
+.position-story-panel,
+.sell-strategy-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding: 18px;
+}
+
+.position-story-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.position-story-grid article,
+.sell-strategy-grid article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.position-story-grid article.positive-card,
+.sell-strategy-grid article.positive-card {
+  border-color: #a7ebd0;
+  background: #f1fff9;
+}
+
+.position-story-grid article.negative-card,
+.sell-strategy-grid article.negative-card {
+  border-color: #ffc9c2;
+  background: #fff7f6;
+}
+
+.position-story-grid span,
+.sell-strategy-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.position-story-grid strong,
+.position-story-grid .trend-value,
+.sell-strategy-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 16px;
+}
+
+.position-story-grid small,
+.sell-strategy-grid small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sell-strategy-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sell-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.strategy-metrics {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+.strategy-metrics b {
+  font-weight: 800;
+}
+
 .transaction-type {
   display: inline-flex;
   justify-content: center;
@@ -2570,6 +2653,7 @@ label {
   .target-settings-grid,
   .benchmark-grid,
   .source-grid,
+  .position-story-grid,
   .fund-dataset-list,
   .fund-exposure-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2651,6 +2735,9 @@ label {
   .fund-dataset-row,
   .benchmark-grid,
   .source-grid,
+  .position-story-grid,
+  .sell-strategy-controls,
+  .sell-strategy-grid,
   .transaction-story-summary,
   .transaction-form,
   .transaction-form.position-mode,

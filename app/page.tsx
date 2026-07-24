@@ -1037,6 +1037,7 @@ export default function Home() {
   const [editingCashFlowId, setEditingCashFlowId] = useState("");
   const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   const [quickSellDraft, setQuickSellDraft] = useState({ assetId: "", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
+  const [sellStrategyDraft, setSellStrategyDraft] = useState({ quantity: "", amount: "", price: "" });
   const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
   const [fundSyncStatus, setFundSyncStatus] = useState("");
   const [lastSync, setLastSync] = useState("");
@@ -1604,6 +1605,17 @@ export default function Home() {
     const profitLoss = openProfitLoss + netRealized;
     const returnBase = historicalPerformanceBase(cost, transactionSummary);
     const returnRate = returnBase ? (profitLoss / returnBase) * 100 : 0;
+    const buyTransactions = chronologicalTransactions.filter((tx) => tx.type === "buy");
+    const sellTransactions = chronologicalTransactions.filter((tx) => tx.type === "sell");
+    const totalBoughtQuantity = buyTransactions.reduce((sum, tx) => sum + Number(tx.quantity || 0), 0);
+    const totalSoldQuantity = sellTransactions.reduce((sum, tx) => sum + Number(tx.quantity || 0), 0);
+    const totalBuyAmount = buyTransactions.reduce((sum, tx) => sum + transactionCashAmount(tx) + Number(tx.fee || 0), 0);
+    const totalSellAmount = sellTransactions.reduce((sum, tx) => sum + transactionCashAmount(tx) - Number(tx.fee || 0), 0);
+    const avgSellPrice = totalSoldQuantity ? totalSellAmount / totalSoldQuantity : 0;
+    const firstBuyDate = buyTransactions[0]?.date || asset.createdAt || "";
+    const principalRecovered = totalSellAmount + transactionSummary.income - transactionSummary.expense;
+    const principalGap = Math.max(0, totalBuyAmount - principalRecovered);
+    const principalStatus = totalBuyAmount > 0 && principalRecovered >= totalBuyAmount ? "Cikti" : totalBuyAmount > 0 ? "Cikmadi" : "Kayit yok";
     const storyRows = chronologicalTransactions.map((tx, index) => {
       const amount = transactionCashAmount(tx);
       const label = transactionTypeLabel(tx.type);
@@ -1663,8 +1675,79 @@ export default function Home() {
       transactions.length ? `${transactions.length} islem kaydi tutuluyor; gerceklesmis sonuc ayrica izleniyor.` : "Bu varlik icin henuz islem gecmisi yok.",
       priceStatus === "Guncel" ? "Fiyat verisi guncel." : priceStatus === "Eski" ? "Fiyat verisi 24 saatten eski olabilir." : priceStatus === "Hata" ? "Fiyat kaynaginda hata kaydi var." : "Fiyat guncelleme kaydi yok.",
     ].filter(Boolean);
-    return { asset, value, cost, profitLoss, openProfitLoss, returnRate, group, groupValue, portfolioShare, categoryShare, targetGap, rank, priceStatus, notes, transactions, storyRows, transactionSummary, netRealized };
+    return {
+      asset,
+      value,
+      cost,
+      profitLoss,
+      openProfitLoss,
+      returnRate,
+      group,
+      groupValue,
+      portfolioShare,
+      categoryShare,
+      targetGap,
+      rank,
+      priceStatus,
+      notes,
+      transactions,
+      storyRows,
+      transactionSummary,
+      netRealized,
+      storyMetrics: {
+        firstBuyDate,
+        totalBoughtQuantity,
+        totalSoldQuantity,
+        avgSellPrice,
+        totalBuyAmount,
+        totalSellAmount,
+        principalRecovered,
+        principalGap,
+        principalStatus,
+      },
+    };
   }, [portfolioRows, selectedAssetId, state.assets, state.transactions, totals.totalValue]);
+
+  const sellStrategy = useMemo(() => {
+    if (!selectedAssetDetail) return null;
+    const asset = selectedAssetDetail.asset;
+    const price = parseAmount(sellStrategyDraft.price) || Number(asset.price || asset.avgCost || 0);
+    const availableQuantity = Number(asset.quantity || 0);
+    const avgCost = Number(asset.avgCost || 0);
+    const perUnitProfit = price - avgCost;
+    const buildScenario = (label: string, quantity: number, note: string) => {
+      const safeQuantity = Math.max(0, Math.min(availableQuantity, quantity || 0));
+      const amount = safeQuantity * price;
+      const costBasis = safeQuantity * avgCost;
+      const realized = amount - costBasis;
+      const remainingQuantity = Math.max(0, availableQuantity - safeQuantity);
+      const remainingCost = remainingQuantity * avgCost;
+      const remainingValue = remainingQuantity * price;
+      return {
+        label,
+        note,
+        quantity: safeQuantity,
+        amount,
+        realized,
+        remainingQuantity,
+        remainingCost,
+        remainingValue,
+        rate: costBasis ? (realized / costBasis) * 100 : 0,
+      };
+    };
+    const principalQuantity = price > 0 ? selectedAssetDetail.cost / price : 0;
+    const halfProfitQuantity = perUnitProfit > 0 ? (selectedAssetDetail.openProfitLoss / 2) / perUnitProfit : 0;
+    const customAmount = parseAmount(sellStrategyDraft.amount);
+    const customQuantity = parseAmount(sellStrategyDraft.quantity) || (customAmount && price ? customAmount / price : 0);
+    return {
+      price,
+      scenarios: [
+        buildScenario("Ana para kadar sat", principalQuantity, "Pozisyon maliyetine yakin tutari nakde cevirir."),
+        buildScenario("Karin yarisini al", halfProfitQuantity, "Acik karin yaklasik yarisini realize eder."),
+        buildScenario("Ozel deneme", customQuantity, "Girdigin adet veya tutara gore hesaplanir."),
+      ],
+    };
+  }, [selectedAssetDetail, sellStrategyDraft]);
 
   const dataStatusRows = useMemo(() => {
     return state.assets.map((asset) => {
@@ -4495,6 +4578,81 @@ export default function Home() {
                 <p>{selectedAssetDetail.asset.note || "Bu varlik icin not eklenmemis."}</p>
               </section>
             </div>
+
+            <section className="position-story-panel">
+              <div className="transaction-head">
+                <div>
+                  <h3>Pozisyon Hikayesi 2.0</h3>
+                  <p>Bu varligin alis, satis, kalan maliyet ve ana para durumunu ozetler.</p>
+                </div>
+              </div>
+              <div className="position-story-grid">
+                <article><span>Ilk alis tarihi</span><strong>{selectedAssetDetail.storyMetrics.firstBuyDate || "-"}</strong><small>Portfoye ekleme / ilk islem</small></article>
+                <article><span>Toplam alinan</span><strong>{num(selectedAssetDetail.storyMetrics.totalBoughtQuantity)}</strong><small>{money(selectedAssetDetail.storyMetrics.totalBuyAmount)} toplam alis</small></article>
+                <article><span>Toplam satilan</span><strong>{num(selectedAssetDetail.storyMetrics.totalSoldQuantity)}</strong><small>{selectedAssetDetail.storyMetrics.avgSellPrice ? `${money(selectedAssetDetail.storyMetrics.avgSellPrice, selectedAssetDetail.asset.currency)} ort. satis` : "Satis yok"}</small></article>
+                <article className={selectedAssetDetail.storyMetrics.principalStatus === "Cikti" ? "positive-card" : selectedAssetDetail.storyMetrics.totalBuyAmount ? "negative-card" : ""}>
+                  <span>Ana para durumu</span>
+                  <strong>{selectedAssetDetail.storyMetrics.principalStatus}</strong>
+                  <small>{selectedAssetDetail.storyMetrics.principalGap ? `${money(selectedAssetDetail.storyMetrics.principalGap)} kaldi` : `${money(selectedAssetDetail.storyMetrics.principalRecovered)} geri alindi`}</small>
+                </article>
+                <article><span>Kalan maliyet</span><strong>{money(selectedAssetDetail.cost)}</strong><small>{num(selectedAssetDetail.asset.quantity)} adet acik</small></article>
+                <article className={selectedAssetDetail.netRealized >= 0 ? "positive-card" : "negative-card"}><span>Gerceklesmis kar</span><TrendValue trend={selectedAssetDetail.netRealized}>{signedMoney(selectedAssetDetail.netRealized)}</TrendValue><small>Satis + gelir - gider</small></article>
+              </div>
+            </section>
+
+            {selectedAssetDetail.asset.quantity > 0 && selectedAssetDetail.asset.type !== "Nakit" && sellStrategy ? (
+              <section className="sell-strategy-panel">
+                <div className="transaction-head">
+                  <div>
+                    <h3>Satis Stratejisi Yardimcisi</h3>
+                    <p>Farkli satis senaryolarinda kasaya girecek tutari, kalan adedi ve gerceklesecek sonucu hesaplar.</p>
+                  </div>
+                </div>
+                <div className="sell-strategy-controls">
+                  <label>Birim satis fiyati
+                    <input className="input" inputMode="decimal" value={sellStrategyDraft.price} onChange={(event) => setSellStrategyDraft({ ...sellStrategyDraft, price: event.target.value })} placeholder={money(selectedAssetDetail.asset.price, selectedAssetDetail.asset.currency)} />
+                  </label>
+                  <label>Ozel satilacak adet
+                    <input className="input" inputMode="decimal" value={sellStrategyDraft.quantity} onChange={(event) => setSellStrategyDraft({ ...sellStrategyDraft, quantity: event.target.value, amount: "" })} placeholder="Istege bagli" />
+                  </label>
+                  <label>Ozel satis tutari
+                    <input className="input" inputMode="decimal" value={sellStrategyDraft.amount} onChange={(event) => setSellStrategyDraft({ ...sellStrategyDraft, amount: event.target.value, quantity: "" })} placeholder="Istege bagli" />
+                  </label>
+                </div>
+                <div className="sell-strategy-grid">
+                  {sellStrategy.scenarios.map((scenario) => (
+                    <article className={scenario.realized >= 0 ? "positive-card" : "negative-card"} key={scenario.label}>
+                      <span>{scenario.label}</span>
+                      <strong>{money(scenario.amount)}</strong>
+                      <small>{scenario.note}</small>
+                      <div className="strategy-metrics">
+                        <b>{num(scenario.quantity)} adet sat</b>
+                        <b>{num(scenario.remainingQuantity)} adet kalir</b>
+                        <b className={scenario.realized >= 0 ? "positive" : "negative"}>{signedMoney(scenario.realized)} · {signedPct(scenario.rate)}</b>
+                      </div>
+                      <button
+                        className="secondary"
+                        disabled={!scenario.quantity || !sellStrategy.price}
+                        onClick={() => {
+                          setSelectedAssetId("");
+                          setQuickSellDraft({
+                            assetId: selectedAssetDetail.asset.id,
+                            quantity: amountFieldValue(scenario.quantity),
+                            price: amountFieldValue(sellStrategy.price),
+                            amount: amountFieldValue(scenario.amount),
+                            fee: "",
+                            date: plainDate(),
+                            note: scenario.label,
+                          });
+                        }}
+                      >
+                        Satis formuna aktar
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <div className="transaction-panel">
               <div className="transaction-head">

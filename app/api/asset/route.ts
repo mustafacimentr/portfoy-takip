@@ -10,10 +10,69 @@ function favicon(domain: string) {
 
 const knownFunds: Record<string, { name: string; domain: string; priceSource: string }> = {
   AFT: { name: "Ak Portfoy Yeni Teknolojiler Yabanci Hisse Senedi Fonu", domain: "akportfoy.com.tr", priceSource: "akportfoy" },
+  AFA: { name: "Ak Portfoy Amerika Yabanci Hisse Senedi Fonu", domain: "akportfoy.com.tr", priceSource: "tefas" },
+  AFO: { name: "Ak Portfoy Alternatif Enerji Yabanci Hisse Senedi Fonu", domain: "akportfoy.com.tr", priceSource: "tefas" },
+  AFS: { name: "Ak Portfoy Saglik Sektoru Yabanci Hisse Senedi Fonu", domain: "akportfoy.com.tr", priceSource: "tefas" },
   TMG: { name: "Is Portfoy Yabanci Hisse Senedi Fonu", domain: "isportfoy.com.tr", priceSource: "isportfoy" },
   TGE: { name: "Is Portfoy Emtia Yabanci BYF Fon Sepeti Fonu", domain: "isportfoy.com.tr", priceSource: "isportfoy" },
   KPH: { name: "Is Portfoy Kar Payi Odeyen Hisse Senedi TL Fonu", domain: "isportfoy.com.tr", priceSource: "isportfoy" },
+  IPB: { name: "Is Portfoy Blockchain Teknolojileri Karma Fon", domain: "isportfoy.com.tr", priceSource: "tefas" },
+  IHK: { name: "Is Portfoy Hisse Senedi Fonu", domain: "isportfoy.com.tr", priceSource: "tefas" },
+  GMR: { name: "Garanti Portfoy Metaverse ve Yeni Teknolojiler Degisken Fon", domain: "garantiportfoy.com.tr", priceSource: "tefas" },
+  GSP: { name: "Garanti Portfoy S&P 500 Yabanci BYF Fon Sepeti Fonu", domain: "garantiportfoy.com.tr", priceSource: "tefas" },
+  DVT: { name: "Deniz Portfoy Teknoloji Sirketleri Hisse Senedi Fonu", domain: "denizportfoy.com", priceSource: "tefas" },
+  ZBJ: { name: "Ziraat Portfoy Birinci Hisse Senedi Fonu", domain: "ziraatportfoy.com.tr", priceSource: "tefas" },
+  MAC: { name: "Marmara Capital Portfoy Hisse Senedi Fonu", domain: "marmaracapital.com.tr", priceSource: "tefas" },
+  TTE: { name: "TEB Portfoy Teknoloji Degisken Fon", domain: "tebportfoy.com.tr", priceSource: "tefas" },
+  TCD: { name: "Tacirler Portfoy Degisken Fon", domain: "tacirlerportfoy.com.tr", priceSource: "tefas" },
 };
+
+const stockLogoDomains: Record<string, string> = {
+  AKBNK: "akbank.com",
+  AKSA: "aksa.com",
+  AKSEN: "aksen.com.tr",
+  ALARK: "alarko.com.tr",
+  ARCLK: "arcelikglobal.com",
+  ASELS: "aselsan.com",
+  ASTOR: "astoras.com.tr",
+  BIMAS: "bim.com.tr",
+  CCOLA: "cci.com.tr",
+  CIMSA: "cimsa.com.tr",
+  DOAS: "dogusotomotiv.com.tr",
+  EKGYO: "emlakkonut.com.tr",
+  ENJSA: "enerjisaenerji.com.tr",
+  ENKAI: "enka.com",
+  EREGL: "erdemir.com.tr",
+  FROTO: "fordotosan.com.tr",
+  GARAN: "garantibbva.com.tr",
+  GUBRF: "gubretas.com.tr",
+  HALKB: "halkbank.com.tr",
+  HEKTS: "hektas.com.tr",
+  ISCTR: "isbank.com.tr",
+  KCHOL: "koc.com.tr",
+  KRDMD: "kardemir.com",
+  MGROS: "migroskurumsal.com",
+  PETKM: "petkim.com.tr",
+  PGSUS: "flypgs.com",
+  SAHOL: "sabanci.com",
+  SASA: "sasa.com.tr",
+  SISE: "sisecam.com.tr",
+  TAVHL: "tavhavalimanlari.com.tr",
+  TCELL: "turkcell.com.tr",
+  THYAO: "thy.com",
+  TKFEN: "tekfen.com.tr",
+  TOASO: "tofas.com.tr",
+  TTKOM: "turktelekom.com.tr",
+  TUPRS: "tupras.com.tr",
+  ULKER: "ulker.com.tr",
+  VAKBN: "vakifbank.com.tr",
+  YKBNK: "yapikredi.com.tr",
+  ZOREN: "zorluenerji.com.tr",
+};
+
+function coinCapIcon(symbol: string) {
+  return `https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`;
+}
 
 async function discoverFund(code: string) {
   const known = knownFunds[code];
@@ -60,6 +119,7 @@ async function discoverStock(code: string) {
     priceSource: "yahoo",
     priceSymbol: symbol,
     autoUpdate: true,
+    logoUrl: stockLogoDomains[code] ? favicon(stockLogoDomains[code]) : "",
   };
 }
 
@@ -90,7 +150,7 @@ async function discoverCrypto(raw: string) {
     priceSource: "binance",
     priceSymbol: `${base === "RNDR" ? "RENDER" : base}${quote}`,
     autoUpdate: true,
-    logoUrl,
+    logoUrl: logoUrl || coinCapIcon(base),
   };
 }
 

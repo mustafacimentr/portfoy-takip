@@ -379,9 +379,55 @@ const assetLogoDomains: Record<string, string> = {
   TAVHL: "tavhavalimanlari.com.tr",
   ULKER: "ulker.com.tr",
   PGSUS: "flypgs.com",
-  GARAN: "garantibbva.com.tr",
+  AKBNK: "akbank.com",
+  AKSA: "aksa.com",
+  AKSEN: "aksen.com.tr",
+  ALARK: "alarko.com.tr",
+  ARCLK: "arcelikglobal.com",
   ASELS: "aselsan.com",
-  AFT: "akportfoy.com.tr",
+  ASTOR: "astoras.com.tr",
+  BERA: "bera.com.tr",
+  CCOLA: "cci.com.tr",
+  CIMSA: "cimsa.com.tr",
+  DOAS: "dogusotomotiv.com.tr",
+  EKGYO: "emlakkonut.com.tr",
+  ENJSA: "enerjisaenerji.com.tr",
+  ENKAI: "enka.com",
+  EREGL: "erdemir.com.tr",
+  GARAN: "garantibbva.com.tr",
+  GUBRF: "gubretas.com.tr",
+  HALKB: "halkbank.com.tr",
+  HEKTS: "hektas.com.tr",
+  ISCTR: "isbank.com.tr",
+  KCHOL: "koc.com.tr",
+  KRDMD: "kardemir.com",
+  KOZAA: "kozaaltin.com.tr",
+  KOZAL: "kozaaltin.com.tr",
+  MGROS: "migroskurumsal.com",
+  OYAKC: "oyakcimento.com",
+  PETKM: "petkim.com.tr",
+  SAHOL: "sabanci.com",
+  SASA: "sasa.com.tr",
+  SISE: "sisecam.com.tr",
+  TCELL: "turkcell.com.tr",
+  THYAO: "thy.com",
+  TKFEN: "tekfen.com.tr",
+  TOASO: "tofas.com.tr",
+  TTKOM: "turktelekom.com.tr",
+  YKBNK: "yapikredi.com.tr",
+  ZOREN: "zorluenerji.com.tr",
+  AFA: "akportfoy.com.tr",
+  AFO: "akportfoy.com.tr",
+  AFS: "akportfoy.com.tr",
+  IPB: "isportfoy.com.tr",
+  IHK: "isportfoy.com.tr",
+  GMR: "garantiportfoy.com.tr",
+  GSP: "garantiportfoy.com.tr",
+  DVT: "denizportfoy.com",
+  ZBJ: "ziraatportfoy.com.tr",
+  MAC: "marmaracapital.com.tr",
+  TTE: "tebportfoy.com.tr",
+  TCD: "tacirlerportfoy.com.tr",
 };
 
 function uid() {
@@ -406,12 +452,17 @@ function cryptoBaseCode(symbol: string) {
   return quote ? compact.slice(0, -quote.length) : compact;
 }
 
+function coinCapIconUrl(symbol: string) {
+  return `https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`;
+}
+
 function assetLogoUrl(asset: Asset) {
   if (asset.logoUrl) return asset.logoUrl;
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   if (asset.type === "Nakit" || code === "NAKIT") return "";
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
   if (cryptoBase && cryptoLogoUrls[cryptoBase]) return cryptoLogoUrls[cryptoBase];
+  if (cryptoBase) return coinCapIconUrl(cryptoBase);
   if (directAssetLogoUrls[code]) return directAssetLogoUrls[code];
   const domain = assetLogoDomains[code] || assetLogoDomains[compactCode(asset.priceSymbol || "")];
   if (domain) return faviconUrl(domain);
@@ -3312,8 +3363,8 @@ export default function Home() {
         <div className="brand">
           <img className="profile-mark" src="/mustafa-cimen.jpg" alt="Mustafa Cimen" />
           <div>
-            <strong>Mustafa Cimen Portfoy Takip</strong>
-            <span>Mustafa Cimen Portfoy Paneli</span>
+            <strong>Mustafa Çimen</strong>
+            <span>Portföy Takip Paneli</span>
           </div>
         </div>
         <nav className="side-menu" aria-label="Portfoy bolumleri">

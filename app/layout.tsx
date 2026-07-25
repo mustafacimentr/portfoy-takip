@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mustafa Cimen Portfoy Takip",
-  description: "Mustafa Cimen portfoy takip paneli.",
+  title: "Mustafa Çimen Portföy Takip",
+  description: "Mustafa Çimen portföy takip paneli.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

@@ -1,7 +1,7 @@
 import { requirePasscode } from "../_lib/auth";
 
 function compact(value: string) {
-  return String(value || "").toUpperCase().replace(/^BIST:/, "").replace(/[^A-Z0-9]/g, "");
+  return String(value || "").toUpperCase().replace(/^BIST:/, "").replace(/\.IS$/, "").replace(/[^A-Z0-9]/g, "");
 }
 
 function favicon(domain: string) {
@@ -51,6 +51,7 @@ const stockLogoDomains: Record<string, string> = {
   ISCTR: "isbank.com.tr",
   KCHOL: "koc.com.tr",
   KRDMD: "kardemir.com",
+  KTLEV: "katilimevim.com.tr",
   MGROS: "migroskurumsal.com",
   PETKM: "petkim.com.tr",
   PGSUS: "flypgs.com",
@@ -72,6 +73,11 @@ const stockLogoDomains: Record<string, string> = {
 
 function coinCapIcon(symbol: string) {
   return `https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`;
+}
+
+function logoApi(code: string, type: string, source: string) {
+  const params = new URLSearchParams({ code, type, source });
+  return `/api/logo?${params.toString()}`;
 }
 
 async function discoverFund(code: string) {
@@ -119,7 +125,7 @@ async function discoverStock(code: string) {
     priceSource: "yahoo",
     priceSymbol: symbol,
     autoUpdate: true,
-    logoUrl: stockLogoDomains[code] ? favicon(stockLogoDomains[code]) : "",
+    logoUrl: stockLogoDomains[code] ? favicon(stockLogoDomains[code]) : logoApi(code, "Hisse", "yahoo"),
   };
 }
 

@@ -401,6 +401,7 @@ const assetLogoDomains: Record<string, string> = {
   ISCTR: "isbank.com.tr",
   KCHOL: "koc.com.tr",
   KRDMD: "kardemir.com",
+  KTLEV: "katilimevim.com.tr",
   KOZAA: "kozaaltin.com.tr",
   KOZAL: "kozaaltin.com.tr",
   MGROS: "migroskurumsal.com",
@@ -435,7 +436,7 @@ function uid() {
 }
 
 function compactCode(value: string) {
-  return String(value || "").toUpperCase().replace(/^BIST:/, "").replace(/[^A-Z0-9]/g, "");
+  return String(value || "").toUpperCase().replace(/^BIST:/, "").replace(/\.IS$/, "").replace(/[^A-Z0-9]/g, "");
 }
 
 function faviconUrl(domain: string) {
@@ -456,6 +457,15 @@ function coinCapIconUrl(symbol: string) {
   return `https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`;
 }
 
+function logoApiUrl(asset: Asset, code: string) {
+  const params = new URLSearchParams({
+    code,
+    type: asset.type || "",
+    source: asset.priceSource || "",
+  });
+  return `/api/logo?${params.toString()}`;
+}
+
 function assetLogoUrl(asset: Asset) {
   if (asset.logoUrl) return asset.logoUrl;
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
@@ -469,6 +479,8 @@ function assetLogoUrl(asset: Asset) {
   if (asset.priceSource === "isportfoy") return faviconUrl("isportfoy.com.tr");
   if (asset.priceSource === "akportfoy") return faviconUrl("akportfoy.com.tr");
   if (asset.priceSource === "tefas") return faviconUrl("tefas.gov.tr");
+  if (asset.type === "Hisse" || asset.priceSource === "yahoo") return logoApiUrl(asset, code);
+  if (asset.type === "Fon") return logoApiUrl(asset, code);
   return "";
 }
 

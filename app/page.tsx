@@ -379,6 +379,7 @@ const assetLogoDomains: Record<string, string> = {
   TAVHL: "tavhavalimanlari.com.tr",
   ULKER: "ulker.com.tr",
   PGSUS: "flypgs.com",
+  QNBTR: "qnb.com.tr",
   AKBNK: "akbank.com",
   AKSA: "aksa.com",
   AKSEN: "aksen.com.tr",
@@ -465,34 +466,27 @@ function specialAssetLogoUrl(code: string) {
   if (code === "ALTINS1" || code === "ALTIN") {
     return svgLogoUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-        <defs>
-          <linearGradient id="g" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#fff3b0"/>
-            <stop offset=".46" stop-color="#d9a51c"/>
-            <stop offset="1" stop-color="#8a5a09"/>
-          </linearGradient>
-        </defs>
-        <circle cx="32" cy="32" r="29" fill="#fff8dd" stroke="#d9a51c" stroke-width="3"/>
-        <circle cx="32" cy="32" r="21" fill="url(#g)"/>
-        <path d="M22 39h20l-4-15H26l-4 15Z" fill="#fff1a8" stroke="#8a5a09" stroke-width="2" stroke-linejoin="round"/>
-        <path d="M27 24h10l-2-7h-6l-2 7Z" fill="#ffd96a" stroke="#8a5a09" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="32" cy="32" r="30" fill="#f3f6fb"/>
+        <circle cx="32" cy="32" r="21" fill="#fff" stroke="#e42c2c" stroke-width="3"/>
+        <circle cx="32" cy="32" r="13" fill="none" stroke="#e42c2c" stroke-width="2"/>
+        <path d="M32 17l2 5 5-2-2 5 5 2-5 2 2 5-5-2-2 5-2-5-5 2 2-5-5-2 5-2-2-5 5 2 2-5Z" fill="none" stroke="#e42c2c" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M32 25a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm0 4v6m-3-3h6" fill="none" stroke="#e42c2c" stroke-width="2" stroke-linecap="round"/>
+        <g fill="#e42c2c">
+          <circle cx="32" cy="9" r="1.4"/><circle cx="43.5" cy="12.6" r="1.4"/><circle cx="50.5" cy="22.5" r="1.4"/>
+          <circle cx="50.5" cy="41.5" r="1.4"/><circle cx="43.5" cy="51.4" r="1.4"/><circle cx="32" cy="55" r="1.4"/>
+          <circle cx="20.5" cy="51.4" r="1.4"/><circle cx="13.5" cy="41.5" r="1.4"/><circle cx="13.5" cy="22.5" r="1.4"/><circle cx="20.5" cy="12.6" r="1.4"/>
+        </g>
       </svg>
     `);
   }
   if (code === "GMSTRF" || code === "GMSTR") {
     return svgLogoUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-        <defs>
-          <linearGradient id="s" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#ffffff"/>
-            <stop offset=".5" stop-color="#c6d3e1"/>
-            <stop offset="1" stop-color="#6a7a91"/>
-          </linearGradient>
-        </defs>
-        <circle cx="32" cy="32" r="29" fill="#f6f9fc" stroke="#8ba1ba" stroke-width="3"/>
-        <circle cx="32" cy="32" r="21" fill="url(#s)"/>
-        <path d="M20 41h24l-5-16H25l-5 16Z" fill="#f7fbff" stroke="#53657a" stroke-width="2" stroke-linejoin="round"/>
-        <path d="M27 25h12l-3-8h-6l-3 8Z" fill="#dce6f1" stroke="#53657a" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="32" cy="32" r="30" fill="#f3f6fb"/>
+        <path d="M32 9v46M9 32h46M15.7 15.7l32.6 32.6M48.3 15.7 15.7 48.3" stroke="#004987" stroke-width="6" stroke-linecap="square"/>
+        <path d="M18 11 32 25 46 11" fill="none" stroke="#b00555" stroke-width="7" stroke-linecap="square" stroke-linejoin="miter"/>
+        <circle cx="32" cy="32" r="9" fill="#f3f6fb"/>
+        <path d="M32 18v28M18 32h28" stroke="#004987" stroke-width="4" stroke-linecap="square"/>
       </svg>
     `);
   }

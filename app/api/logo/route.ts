@@ -67,6 +67,7 @@ const stockLogoDomains: Record<string, string> = {
   OYAKC: "oyakcimento.com",
   PETKM: "petkim.com.tr",
   PGSUS: "flypgs.com",
+  QNBTR: "qnb.com.tr",
   SAHOL: "sabanci.com",
   SASA: "sasa.com.tr",
   SISE: "sisecam.com.tr",

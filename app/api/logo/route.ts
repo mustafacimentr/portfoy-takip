@@ -166,14 +166,14 @@ export async function GET(request: Request) {
       const domain = fundLogoDomains[code] || (source === "akportfoy" ? "akportfoy.com.tr" : source === "isportfoy" ? "isportfoy.com.tr" : "tefas.gov.tr");
       return redirectImage(favicon(domain));
     }
-    if (directStockLogos[code]) return redirectImage(directStockLogos[code]);
-    if (stockLogoDomains[code]) return redirectImage(favicon(stockLogoDomains[code]));
-
     const tradingView = await tradingViewLogo(code);
     if (tradingView) return redirectImage(tradingView);
 
     const yahoo = await yahooCompanyLogo(code);
     if (yahoo) return redirectImage(yahoo);
+
+    if (directStockLogos[code]) return redirectImage(directStockLogos[code]);
+    if (stockLogoDomains[code]) return redirectImage(favicon(stockLogoDomains[code]));
   } catch {
     // Keep the UI fallback visible if every external logo source fails.
   }

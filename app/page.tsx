@@ -462,6 +462,7 @@ function logoApiUrl(asset: Asset, code: string) {
     code,
     type: asset.type || "",
     source: asset.priceSource || "",
+    v: "3",
   });
   return `/api/logo?${params.toString()}`;
 }
@@ -472,13 +473,13 @@ function assetLogoUrl(asset: Asset) {
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
   if (cryptoBase && cryptoLogoUrls[cryptoBase]) return cryptoLogoUrls[cryptoBase];
   if (cryptoBase) return coinCapIconUrl(cryptoBase);
+  if (asset.type === "Hisse" || asset.priceSource === "yahoo") return logoApiUrl(asset, code);
+  if (asset.type === "Fon") return logoApiUrl(asset, code);
   const domain = assetLogoDomains[code] || assetLogoDomains[compactCode(asset.priceSymbol || "")];
   if (domain) return faviconUrl(domain);
   if (asset.priceSource === "isportfoy") return faviconUrl("isportfoy.com.tr");
   if (asset.priceSource === "akportfoy") return faviconUrl("akportfoy.com.tr");
   if (asset.priceSource === "tefas") return faviconUrl("tefas.gov.tr");
-  if (asset.type === "Hisse" || asset.priceSource === "yahoo") return logoApiUrl(asset, code);
-  if (asset.type === "Fon") return logoApiUrl(asset, code);
   if (directAssetLogoUrls[code]) return directAssetLogoUrls[code];
   if (asset.logoUrl) return asset.logoUrl;
   return "";

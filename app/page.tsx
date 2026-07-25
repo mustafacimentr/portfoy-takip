@@ -41,10 +41,16 @@ type WatchItem = {
   targetWeight: number;
   note: string;
   price: number;
+  priceHistory?: WatchPricePoint[];
   lastPriceAt?: string;
   lastPriceError?: string;
   logoUrl?: string;
   createdAt?: string;
+};
+
+type WatchPricePoint = {
+  date: string;
+  price: number;
 };
 
 type Transaction = {
@@ -285,6 +291,8 @@ const knownNames: Record<string, { name: string; type?: string; source?: string;
   TGE: { name: "Is Portfoy Emtia Yabanci BYF Fon Sepeti Fonu", type: "Fon", source: "isportfoy", symbol: "TGE" },
   KPH: { name: "Is Portfoy Kar Payi Odeyen Hisse Senedi TL Fonu", type: "Fon", source: "isportfoy", symbol: "KPH" },
   AFT: { name: "Ak Portfoy Yeni Teknolojiler Yabanci Hisse Senedi Fonu", type: "Fon", source: "akportfoy", symbol: "AFT" },
+  GARAN: { name: "Turkiye Garanti Bankasi A.S.", type: "Hisse", source: "yahoo", symbol: "GARAN.IS" },
+  ASELS: { name: "ASELSAN Elektronik Sanayi ve Ticaret Anonim Sirketi", type: "Hisse", source: "yahoo", symbol: "ASELS.IS" },
 };
 
 const types = ["Hisse", "Fon", "Kripto", "Doviz", "Altin", "Nakit", "Diger"];
@@ -352,6 +360,8 @@ const cryptoLogoUrls: Record<string, string> = {
 const directAssetLogoUrls: Record<string, string> = {
   FROTO: "https://companieslogo.com/img/orig/FROTO.IS-0beb2e34.png?t=1720244491",
   ULKER: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/%C3%9Clker_logo_%282%29.svg/250px-%C3%9Clker_logo_%282%29.svg.png",
+  GARAN: "https://www.garantibbvainvestorrelations.com/favicon.ico",
+  ASELS: "https://www.aselsan.com/assets/images/favicon.ico",
 };
 const assetLogoDomains: Record<string, string> = {
   ALTINS1: "darphane.gov.tr",
@@ -368,6 +378,9 @@ const assetLogoDomains: Record<string, string> = {
   TAVHL: "tavhavalimanlari.com.tr",
   ULKER: "ulker.com.tr",
   PGSUS: "flypgs.com",
+  GARAN: "garantibbva.com.tr",
+  ASELS: "aselsan.com",
+  AFT: "akportfoy.com.tr",
 };
 
 function uid() {
@@ -402,6 +415,7 @@ function assetLogoUrl(asset: Asset) {
   const domain = assetLogoDomains[code] || assetLogoDomains[compactCode(asset.priceSymbol || "")];
   if (domain) return faviconUrl(domain);
   if (asset.priceSource === "isportfoy") return faviconUrl("isportfoy.com.tr");
+  if (asset.priceSource === "akportfoy") return faviconUrl("akportfoy.com.tr");
   if (asset.priceSource === "tefas") return faviconUrl("tefas.gov.tr");
   return "";
 }
@@ -908,6 +922,32 @@ function formatAge(value?: string) {
   return `${Math.round(hours / 24)} gun once`;
 }
 
+function dateMonthsAgo(months: number) {
+  const date = new Date();
+  date.setMonth(date.getMonth() - months);
+  return plainDate(date);
+}
+
+function watchPerformancePeriods(item: WatchItem) {
+  const history = (item.priceHistory || [])
+    .map(normalizeWatchPricePoint)
+    .filter((point) => point.price > 0)
+    .sort((left, right) => left.date.localeCompare(right.date));
+  const latest = Number(item.price || history[history.length - 1]?.price || 0);
+  return [
+    { key: "1m", label: "1 Ay", months: 1 },
+    { key: "3m", label: "3 Ay", months: 3 },
+    { key: "6m", label: "6 Ay", months: 6 },
+    { key: "12m", label: "12 Ay", months: 12 },
+  ].map((period) => {
+    const targetDate = dateMonthsAgo(period.months);
+    const base = history.filter((point) => point.date <= targetDate).slice(-1)[0];
+    const change = base && latest > 0 ? latest - base.price : 0;
+    const rate = base && base.price > 0 ? (change / base.price) * 100 : 0;
+    return { ...period, basePrice: base?.price || 0, change, rate, ready: Boolean(base && latest > 0) };
+  });
+}
+
 function inferAssetDetails(input: string) {
   const raw = String(input || "").trim().toUpperCase();
   const parts = raw.split(/[/-]/).filter(Boolean);
@@ -971,6 +1011,25 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
   };
 }
 
+function normalizeWatchPricePoint(point: Partial<WatchPricePoint>): WatchPricePoint {
+  return {
+    date: point.date || plainDate(),
+    price: Number(point.price || 0),
+  };
+}
+
+function recordWatchPriceHistory(item: Partial<WatchItem>, price: number, date = plainDate()) {
+  if (!Number.isFinite(price) || price <= 0) return (item.priceHistory || []).map(normalizeWatchPricePoint);
+  return [
+    ...(item.priceHistory || [])
+      .map(normalizeWatchPricePoint)
+      .filter((point) => point.date !== date && point.price > 0),
+    { date, price },
+  ]
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .slice(-400);
+}
+
 function normalizeWatchItem(item: Partial<WatchItem>): WatchItem {
   const details = inferAssetDetails(item.ticker || "");
   const priceSource = item.priceSource || details.priceSource;
@@ -989,6 +1048,7 @@ function normalizeWatchItem(item: Partial<WatchItem>): WatchItem {
     targetWeight: Number(item.targetWeight || 0),
     note: item.note || "",
     price,
+    priceHistory: recordWatchPriceHistory(item, price),
     lastPriceAt: item.lastPriceAt,
     lastPriceError: item.lastPriceError,
     logoUrl: item.logoUrl,
@@ -1492,7 +1552,7 @@ export default function Home() {
         : isBuyZone
           ? { label: "Alim bolgesi", tone: "ok" }
           : { label: "Hedef ustu", tone: "muted" };
-      return { item, asset, currentPrice, targetPrice, gap, gapRate, isBuyZone, missingPrice, status };
+      return { item, asset, currentPrice, targetPrice, gap, gapRate, isBuyZone, missingPrice, status, periods: watchPerformancePeriods(item) };
     }).sort((left, right) => {
       if (left.missingPrice !== right.missingPrice) return Number(left.missingPrice) - Number(right.missingPrice);
       if (left.isBuyZone !== right.isBuyZone) return Number(right.isBuyZone) - Number(left.isBuyZone);
@@ -3727,6 +3787,16 @@ export default function Home() {
                     <div><span>Fark</span><strong className={row.gapRate <= 0 && row.targetPrice ? "positive" : "negative"}>{row.targetPrice && row.currentPrice ? signedPct(row.gapRate) : "-"}</strong></div>
                     <div><span>Hedef pay</span><strong>{row.item.targetWeight ? pct(row.item.targetWeight) : "-"}</strong></div>
                   </div>
+                  <div className="watch-period-grid">
+                    {row.periods.map((period) => (
+                      <div key={period.key}>
+                        <span>{period.label}</span>
+                        <strong className={period.ready ? period.rate >= 0 ? "positive" : "negative" : ""}>
+                          {period.ready ? signedPct(period.rate) : "Veri birikiyor"}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
                   {row.item.note ? <p className="watch-note">{row.item.note}</p> : null}
                   <div className="watch-meta">
                     <span>{row.item.priceSource} / {row.item.priceSymbol}</span>
@@ -4505,6 +4575,53 @@ export default function Home() {
                 </table>
               ) : (
                 <div className="report-empty-state">Henuz rapora yansiyacak satis, gelir veya gider islemi yok.</div>
+              )}
+            </section>
+          </section>
+
+          <section className="report-page watch-report-page">
+            <div className="report-hero compact"><div><h1>Izleme Listem</h1><p>Portfoye eklenmeden once takip edilen alim firsatlari ve hedef fiyatlar.</p></div></div>
+            <section className="report-panel watch-report-panel">
+              <div className="report-panel-head"><h2>Alim Firsati Takibi</h2><p>Guncel fiyat, hedef fiyat ve biriken fiyat gecmisine gore donemsel degisim.</p></div>
+              {watchRows.length ? (
+                <table className="report-table watch-report-table">
+                  <thead>
+                    <tr>
+                      <th>Varlik</th>
+                      <th>Kaynak</th>
+                      <th>Guncel</th>
+                      <th>Hedef</th>
+                      <th>Fark</th>
+                      <th>1 Ay</th>
+                      <th>3 Ay</th>
+                      <th>6 Ay</th>
+                      <th>12 Ay</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {watchRows.map((row) => (
+                      <tr key={row.item.id}>
+                        <td>
+                          <span className="report-asset-cell">
+                            <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small />
+                            <span><strong>{row.item.ticker}</strong><small>{row.item.name}</small></span>
+                          </span>
+                        </td>
+                        <td><span className={`watch-status ${row.status.tone}`}>{row.status.label}</span><small>{row.item.priceSource} / {row.item.priceSymbol}</small></td>
+                        <td>{row.currentPrice ? money(row.currentPrice, row.item.currency || "TRY") : "-"}</td>
+                        <td>{row.targetPrice ? money(row.targetPrice, row.item.currency || "TRY") : "-"}</td>
+                        <td className={row.gapRate <= 0 && row.targetPrice ? "positive" : "negative"}>{row.targetPrice && row.currentPrice ? signedPct(row.gapRate) : "-"}</td>
+                        {row.periods.map((period) => (
+                          <td key={period.key} className={period.ready ? period.rate >= 0 ? "positive" : "negative" : ""}>
+                            {period.ready ? signedPct(period.rate) : "-"}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="report-empty-state">Izleme listesinde henuz varlik yok.</div>
               )}
             </section>
           </section>

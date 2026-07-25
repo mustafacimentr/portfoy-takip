@@ -521,6 +521,12 @@ select:focus {
   gap: 8px;
 }
 
+.watch-period-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .watch-price-grid div {
   background: #f7f9fb;
   border: 1px solid #e6edf4;
@@ -529,17 +535,30 @@ select:focus {
   min-width: 0;
 }
 
+.watch-period-grid div {
+  border: 1px solid #e6edf4;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+}
+
 .watch-price-grid span,
+.watch-period-grid span,
 .watch-meta {
   color: var(--muted);
   font-size: 11px;
 }
 
-.watch-price-grid strong {
+.watch-price-grid strong,
+.watch-period-grid strong {
   display: block;
   margin-top: 4px;
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+.watch-period-grid strong {
+  font-size: 12px;
 }
 
 .watch-note {
@@ -2858,6 +2877,7 @@ label {
   .sell-strategy-grid,
   .watchlist-grid,
   .watch-price-grid,
+  .watch-period-grid,
   .transaction-story-summary,
   .transaction-form,
   .transaction-form.position-mode,
@@ -3568,6 +3588,11 @@ label {
     page-break-before: always;
   }
 
+  .print-report .watch-report-page {
+    break-before: page;
+    page-break-before: always;
+  }
+
   .print-report .assets-page .report-hero,
   .print-report .report-page > .report-hero {
     margin-top: 0;
@@ -3679,6 +3704,37 @@ label {
   .transaction-report-table tr {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .watch-report-panel {
+    overflow: visible;
+  }
+
+  .watch-report-table {
+    font-size: 7.5px;
+  }
+
+  .watch-report-table th,
+  .watch-report-table td {
+    padding: 5px 4px;
+    vertical-align: middle;
+  }
+
+  .watch-report-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .watch-report-table .watch-status {
+    display: inline-block;
+    padding: 3px 6px;
+    margin-bottom: 2px;
+    font-size: 7px;
+  }
+
+  .watch-report-table td:nth-child(2) small {
+    display: block;
+    color: var(--muted);
   }
 
   .transaction-report-table th:nth-child(2),

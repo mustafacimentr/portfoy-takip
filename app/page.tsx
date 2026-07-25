@@ -498,7 +498,7 @@ function logoApiUrl(asset: Asset, code: string) {
     code,
     type: asset.type || "",
     source: asset.priceSource || "",
-    v: "3",
+    v: "4",
   });
   return `/api/logo?${params.toString()}`;
 }

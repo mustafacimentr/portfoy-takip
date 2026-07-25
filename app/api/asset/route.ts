@@ -125,7 +125,7 @@ async function discoverStock(code: string) {
     priceSource: "yahoo",
     priceSymbol: symbol,
     autoUpdate: true,
-    logoUrl: stockLogoDomains[code] ? favicon(stockLogoDomains[code]) : logoApi(code, "Hisse", "yahoo"),
+    logoUrl: logoApi(code, "Hisse", "yahoo"),
   };
 }
 

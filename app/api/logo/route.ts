@@ -86,7 +86,7 @@ const stockLogoDomains: Record<string, string> = {
 
 const directStockLogos: Record<string, string> = {
   FROTO: "https://companieslogo.com/img/orig/FROTO.IS-0beb2e34.png?t=1720244491",
-  QNBTR: "https://upload.wikimedia.org/wikipedia/commons/8/8f/QNB_Logo.svg",
+  QNBTR: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/QNB_Logo.svg/128px-QNB_Logo.svg.png",
   ULKER: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/%C3%9Clker_logo_%282%29.svg/250px-%C3%9Clker_logo_%282%29.svg.png",
 };
 

@@ -29,6 +29,24 @@ type Asset = {
   createdAt?: string;
 };
 
+type WatchItem = {
+  id: string;
+  ticker: string;
+  name: string;
+  type: string;
+  currency: string;
+  priceSource: string;
+  priceSymbol: string;
+  targetPrice: number;
+  targetWeight: number;
+  note: string;
+  price: number;
+  lastPriceAt?: string;
+  lastPriceError?: string;
+  logoUrl?: string;
+  createdAt?: string;
+};
+
 type Transaction = {
   id: string;
   assetId: string;
@@ -97,6 +115,7 @@ type PortfolioSettings = {
 
 type PortfolioState = {
   assets: Asset[];
+  watchlist: WatchItem[];
   transactions: Transaction[];
   history: PortfolioSnapshot[];
   cashFlows: CashFlow[];
@@ -238,6 +257,7 @@ const defaultSettings: PortfolioSettings = {
 
 const emptyState: PortfolioState = {
   assets: [],
+  watchlist: [],
   transactions: [],
   history: [],
   cashFlows: [],
@@ -272,6 +292,7 @@ const menuItems = [
   { key: "distribution", label: "Portfoy Dagilimi", description: "Varlik sinifi, toplam paylar ve mevcut varlik listen." },
   { key: "performance", label: "Performans Gecmisi", description: "Portfoy degerinin zaman icindeki degisimi ve nakit akisi." },
   { key: "targets", label: "Hedef Portfoy", description: "Hedef oranlar, sapmalar ve yeni yatirim dagitim onerisi." },
+  { key: "watchlist", label: "Alim Firsatlari", description: "Portfoye eklemeden once takip etmek istedigin varliklar ve hedef fiyatlar." },
   { key: "comparison", label: "Karsilastirma", description: "Portfoy getirini BIST, altin, doviz, Bitcoin ve global endekslerle karsilastir." },
   { key: "fundOverlap", label: "Fon Icerik & Ortusme", description: "Fonlarin ic varliklarini, ortak pozisyonlarini ve dolayli maruziyeti analiz et." },
   { key: "dataStatus", label: "Veri Durumu", description: "Fiyat kaynaklari, son guncelleme ve hata sagligi." },
@@ -753,6 +774,7 @@ function transactionBelongsToAsset(tx: Transaction, asset: Asset, assetsById: Ma
 function repairPortfolioState(input: PortfolioState): PortfolioState {
   const normalizedState: PortfolioState = {
     assets: (input.assets || []).map(normalizeAsset),
+    watchlist: (input.watchlist || []).map(normalizeWatchItem),
     transactions: (input.transactions || []).map(normalizeTransaction),
     history: (input.history || []).map(normalizeSnapshot),
     cashFlows: (input.cashFlows || []).map(normalizeCashFlow),
@@ -949,6 +971,54 @@ function normalizeAsset(asset: Partial<Asset>): Asset {
   };
 }
 
+function normalizeWatchItem(item: Partial<WatchItem>): WatchItem {
+  const details = inferAssetDetails(item.ticker || "");
+  const priceSource = item.priceSource || details.priceSource;
+  const priceSymbol = item.priceSymbol || details.priceSymbol;
+  const price = Number(item.price || 0);
+  const targetPrice = Number(item.targetPrice || 0);
+  return {
+    id: item.id || uid(),
+    ticker: item.ticker || details.ticker,
+    name: /request rejected/i.test(String(item.name || "")) ? details.name : item.name || details.name,
+    type: item.type || details.type,
+    currency: item.currency || details.currency,
+    priceSource,
+    priceSymbol,
+    targetPrice,
+    targetWeight: Number(item.targetWeight || 0),
+    note: item.note || "",
+    price,
+    lastPriceAt: item.lastPriceAt,
+    lastPriceError: item.lastPriceError,
+    logoUrl: item.logoUrl,
+    createdAt: item.createdAt || plainDate(),
+  };
+}
+
+function watchItemAsAsset(item: WatchItem): Asset {
+  return normalizeAsset({
+    id: item.id,
+    ticker: item.ticker,
+    name: item.name,
+    type: item.type,
+    currency: item.currency,
+    priceSource: item.priceSource,
+    priceSymbol: item.priceSymbol,
+    autoUpdate: item.priceSource !== "manual",
+    fxRate: 1,
+    quantity: 0,
+    avgCost: item.targetPrice || item.price || 0,
+    price: item.price || item.targetPrice || 0,
+    target: item.targetWeight,
+    note: item.note,
+    lastPriceAt: item.lastPriceAt,
+    lastPriceError: item.lastPriceError,
+    logoUrl: item.logoUrl,
+    createdAt: item.createdAt,
+  });
+}
+
 function assetGroupKey(asset: Asset) {
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   if (preciousCodes.has(code)) return "precious";
@@ -1038,6 +1108,7 @@ export default function Home() {
   const [transactionDraft, setTransactionDraft] = useState({ type: "buy", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   const [quickSellDraft, setQuickSellDraft] = useState({ assetId: "", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   const [sellStrategyDraft, setSellStrategyDraft] = useState({ quantity: "", amount: "", price: "" });
+  const [watchDraft, setWatchDraft] = useState({ ticker: "", targetPrice: "", targetWeight: "", note: "" });
   const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
   const [fundSyncStatus, setFundSyncStatus] = useState("");
   const [lastSync, setLastSync] = useState("");
@@ -1067,7 +1138,7 @@ export default function Home() {
       if (state.settings.autoRefresh) void updatePrices();
     }, 30000);
     return () => window.clearInterval(timer);
-  }, [passcode, state.assets, state.settings.autoRefresh]);
+  }, [passcode, state.assets, state.watchlist, state.settings.autoRefresh]);
 
   const totals = useMemo(() => {
     const calculated = totalsFromAssets(state.assets);
@@ -1406,6 +1477,36 @@ export default function Home() {
       .filter((asset) => asset.quantity > 0 && asset.type !== "Nakit")
       .sort((left, right) => left.ticker.localeCompare(right.ticker));
   }, [state.assets]);
+
+  const watchRows = useMemo(() => {
+    return (state.watchlist || []).map(normalizeWatchItem).map((item) => {
+      const asset = watchItemAsAsset(item);
+      const currentPrice = Number(item.price || 0);
+      const targetPrice = Number(item.targetPrice || 0);
+      const gap = targetPrice > 0 && currentPrice > 0 ? currentPrice - targetPrice : 0;
+      const gapRate = targetPrice > 0 && currentPrice > 0 ? (gap / targetPrice) * 100 : 0;
+      const isBuyZone = targetPrice > 0 && currentPrice > 0 && currentPrice <= targetPrice;
+      const missingPrice = currentPrice <= 0 || Boolean(item.lastPriceError);
+      const status = missingPrice
+        ? { label: "Fiyat bekliyor", tone: "warning" }
+        : isBuyZone
+          ? { label: "Alim bolgesi", tone: "ok" }
+          : { label: "Hedef ustu", tone: "muted" };
+      return { item, asset, currentPrice, targetPrice, gap, gapRate, isBuyZone, missingPrice, status };
+    }).sort((left, right) => {
+      if (left.missingPrice !== right.missingPrice) return Number(left.missingPrice) - Number(right.missingPrice);
+      if (left.isBuyZone !== right.isBuyZone) return Number(right.isBuyZone) - Number(left.isBuyZone);
+      return Math.abs(left.gapRate) - Math.abs(right.gapRate) || left.item.ticker.localeCompare(right.item.ticker);
+    });
+  }, [state.watchlist]);
+
+  const watchSummary = useMemo(() => {
+    const priced = watchRows.filter((row) => !row.missingPrice);
+    const buyZone = priced.filter((row) => row.isBuyZone);
+    const closest = priced.slice().sort((left, right) => Math.abs(left.gapRate) - Math.abs(right.gapRate))[0];
+    const errors = watchRows.filter((row) => row.item.lastPriceError).length;
+    return { total: watchRows.length, buyZone: buyZone.length, errors, closest };
+  }, [watchRows]);
 
   const bestAsset = useMemo(() => {
     return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => right.returnRate - left.returnRate)[0];
@@ -2075,6 +2176,7 @@ export default function Home() {
     const data = await api<{ state: PortfolioState }>("/api/portfolio", code);
     const loadedState = repairPortfolioState({
       assets: (data.state.assets || []).map(normalizeAsset),
+      watchlist: (data.state.watchlist || []).map(normalizeWatchItem),
       transactions: (data.state.transactions || []).map(normalizeTransaction),
       history: (data.state.history || []).map(normalizeSnapshot),
       cashFlows: (data.state.cashFlows || []).map(normalizeCashFlow),
@@ -2092,6 +2194,7 @@ export default function Home() {
       return {
         ...nextState,
         history: nextState.history || [],
+        watchlist: (nextState.watchlist || []).map(normalizeWatchItem),
         cashFlows: nextState.cashFlows || [],
         benchmarkHistory: (nextState.benchmarkHistory || []).map(normalizeBenchmarkPoint),
         settings: normalizeSettings(nextState.settings),
@@ -2113,6 +2216,7 @@ export default function Home() {
     return {
       ...nextState,
       history,
+      watchlist: (nextState.watchlist || []).map(normalizeWatchItem),
       cashFlows: (nextState.cashFlows || []).map(normalizeCashFlow),
       benchmarkHistory: (nextState.benchmarkHistory || []).map(normalizeBenchmarkPoint),
       settings: normalizeSettings(nextState.settings),
@@ -2149,7 +2253,7 @@ export default function Home() {
   }
 
   async function updatePrices() {
-    if (!passcode || !state.assets.length) return;
+    if (!passcode || (!state.assets.length && !state.watchlist.length)) return;
     setLoading(true);
     try {
       const today = plainDate();
@@ -2165,8 +2269,20 @@ export default function Home() {
           }
         }),
       );
+      const updatedWatchlist = await Promise.all(
+        (state.watchlist || []).map(async (item) => {
+          const normalized = normalizeWatchItem(item);
+          if (normalized.priceSource === "manual") return normalized;
+          try {
+            const result = await fetchPrice(watchItemAsAsset(normalized));
+            return { ...normalized, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" };
+          } catch (error) {
+            return { ...normalized, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" };
+          }
+        }),
+      );
       const benchmarkHistory = await collectBenchmarkHistory(state.benchmarkHistory);
-      await savePortfolio({ ...state, assets: updated, benchmarkHistory }, { preserveFundHoldings: true });
+      await savePortfolio({ ...state, assets: updated, watchlist: updatedWatchlist, benchmarkHistory }, { preserveFundHoldings: true });
     } finally {
       setLoading(false);
     }
@@ -2190,6 +2306,89 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function submitWatchItem(event: FormEvent) {
+    event.preventDefault();
+    const ticker = watchDraft.ticker.trim();
+    if (!ticker) {
+      alert("Izlemek istedigin varligin kodunu yaz.");
+      return;
+    }
+    const details = inferAssetDetails(ticker);
+    let item = normalizeWatchItem({
+      ticker: details.ticker,
+      name: details.name,
+      type: details.type,
+      currency: details.currency,
+      priceSource: details.priceSource,
+      priceSymbol: details.priceSymbol,
+      targetPrice: parseAmount(watchDraft.targetPrice),
+      targetWeight: parseAmount(watchDraft.targetWeight),
+      note: watchDraft.note,
+      createdAt: plainDate(),
+    });
+    try {
+      const discovered = await discoverDraftAsset(normalizeAsset({ ...watchItemAsAsset(item), ticker: item.ticker }), false);
+      item = normalizeWatchItem({
+        ...item,
+        ticker: discovered.ticker,
+        name: discovered.name,
+        type: discovered.type,
+        currency: discovered.currency,
+        priceSource: discovered.priceSource,
+        priceSymbol: discovered.priceSymbol,
+        logoUrl: discovered.logoUrl,
+      });
+      if (item.priceSource !== "manual") {
+        const result = await fetchPrice(watchItemAsAsset(item));
+        item = normalizeWatchItem({ ...item, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" });
+      }
+    } catch (error) {
+      item = normalizeWatchItem({ ...item, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" });
+    }
+    await savePortfolio({ ...state, watchlist: [...(state.watchlist || []).map(normalizeWatchItem), item] }, { snapshot: false, preserveFundHoldings: true });
+    setWatchDraft({ ticker: "", targetPrice: "", targetWeight: "", note: "" });
+  }
+
+  async function refreshWatchItem(id: string) {
+    const target = (state.watchlist || []).map(normalizeWatchItem).find((item) => item.id === id);
+    if (!target || target.priceSource === "manual") return;
+    setLoading(true);
+    try {
+      let nextItem = target;
+      try {
+        const result = await fetchPrice(watchItemAsAsset(target));
+        nextItem = normalizeWatchItem({ ...target, price: Number(result.price), lastPriceAt: new Date().toISOString(), lastPriceError: "" });
+      } catch (error) {
+        nextItem = normalizeWatchItem({ ...target, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" });
+      }
+      await savePortfolio({
+        ...state,
+        watchlist: (state.watchlist || []).map((item) => item.id === id ? nextItem : normalizeWatchItem(item)),
+      }, { snapshot: false, preserveFundHoldings: true });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteWatchItem(id: string) {
+    await savePortfolio({
+      ...state,
+      watchlist: (state.watchlist || []).filter((item) => item.id !== id).map(normalizeWatchItem),
+    }, { snapshot: false, preserveFundHoldings: true });
+  }
+
+  function moveWatchItemToAssetDraft(item: WatchItem) {
+    const asset = normalizeAsset({ ...watchItemAsAsset(item), id: uid(), quantity: 0, avgCost: item.price || item.targetPrice || 0 });
+    openAsset(asset);
+    setAssetDraftInputs({
+      quantity: "",
+      avgCost: amountFieldValue(item.price || item.targetPrice),
+      fee: "",
+      feeQuantity: "",
+      target: amountFieldValue(item.targetWeight),
+    });
   }
 
   async function toggleAssetAutoUpdate(id: string) {
@@ -2719,6 +2918,7 @@ export default function Home() {
     const data = JSON.parse(text);
     return {
       assets: (data.assets || []).map(normalizeAsset),
+      watchlist: (data.watchlist || []).map(normalizeWatchItem),
       transactions: (data.transactions || []).map(normalizeTransaction),
       history: (data.history || []).map(normalizeSnapshot),
       cashFlows: (data.cashFlows || []).map(normalizeCashFlow),
@@ -2755,7 +2955,7 @@ export default function Home() {
     }).filter((asset) => asset.ticker && asset.quantity > 0);
 
     if (!assets.length) throw new Error("CSV dosyasinda aktarilacak varlik bulunamadi");
-    return { assets, transactions: [], history: [], cashFlows: [], benchmarkHistory: [], settings: defaultSettings };
+    return { assets, watchlist: [], transactions: [], history: [], cashFlows: [], benchmarkHistory: [], settings: defaultSettings };
   }
 
   function normalizeHeader(value: string) {
@@ -3451,6 +3651,99 @@ export default function Home() {
                   );
                 }) : <div className="empty">Varlik bazinda oneriyi hesaplamak icin yeni yatirim tutari ve hedefte eksik kalan bir sinif gerekir.</div>}
               </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "watchlist" ? (
+          <>
+            <section className="insights-grid watch-kpis">
+              <article className="insight-card"><span>Izlenen varlik</span><strong>{watchSummary.total}</strong><small>Portfoy disi takip listesi</small></article>
+              <article className={watchSummary.buyZone ? "insight-card green" : "insight-card"}><span>Alim bolgesinde</span><strong>{watchSummary.buyZone}</strong><small>Hedef fiyatin altinda veya esit</small></article>
+              <article className={watchSummary.closest?.gapRate && watchSummary.closest.gapRate <= 0 ? "insight-card green" : "insight-card gold"}><span>Hedefe en yakin</span><strong>{watchSummary.closest?.item.ticker || "-"}</strong><small>{watchSummary.closest ? signedPct(watchSummary.closest.gapRate) : "Kayit yok"}</small></article>
+              <article className={watchSummary.errors ? "insight-card red" : "insight-card green"}><span>Fiyat hatasi</span><strong>{watchSummary.errors}</strong><small>{watchSummary.errors ? "Kontrol gerekiyor" : "Kaynaklar sakin"}</small></article>
+            </section>
+
+            <section className="panel watch-form-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Alim Firsati / Izleme Listesi</h2>
+                  <p>Portfoye eklemeden once fiyatini, hedef seviyeni ve notunu takip et.</p>
+                </div>
+              </div>
+              <form className="watch-form" onSubmit={(event) => void submitWatchItem(event)}>
+                <label>Kod
+                  <input
+                    className="input"
+                    placeholder="AFT, TUPRS, AVAX/TRY..."
+                    value={watchDraft.ticker}
+                    onChange={(event) => setWatchDraft({ ...watchDraft, ticker: event.target.value.toUpperCase() })}
+                  />
+                </label>
+                <label>Hedef fiyat
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    placeholder="Orn. 280"
+                    value={watchDraft.targetPrice}
+                    onChange={(event) => setWatchDraft({ ...watchDraft, targetPrice: event.target.value })}
+                  />
+                </label>
+                <label>Hedef pay (%)
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    placeholder="Istege bagli"
+                    value={watchDraft.targetWeight}
+                    onChange={(event) => setWatchDraft({ ...watchDraft, targetWeight: event.target.value })}
+                  />
+                </label>
+                <label>Not
+                  <input
+                    className="input"
+                    placeholder="Alim sebebi, destek seviyesi..."
+                    value={watchDraft.note}
+                    onChange={(event) => setWatchDraft({ ...watchDraft, note: event.target.value })}
+                  />
+                </label>
+                <button className="primary">Listeye ekle</button>
+              </form>
+            </section>
+
+            <section className="watchlist-grid">
+              {watchRows.length ? watchRows.map((row) => (
+                <article className={`watch-card ${row.status.tone}`} key={row.item.id}>
+                  <div className="watch-card-head">
+                    <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} />
+                    <div>
+                      <strong>{row.item.ticker}</strong>
+                      <span>{row.item.name}</span>
+                    </div>
+                    <span className={`watch-status ${row.status.tone}`}>{row.status.label}</span>
+                  </div>
+                  <div className="watch-price-grid">
+                    <div><span>Guncel</span><strong>{row.currentPrice ? money(row.currentPrice, row.item.currency || "TRY") : "-"}</strong></div>
+                    <div><span>Hedef</span><strong>{row.targetPrice ? money(row.targetPrice, row.item.currency || "TRY") : "-"}</strong></div>
+                    <div><span>Fark</span><strong className={row.gapRate <= 0 && row.targetPrice ? "positive" : "negative"}>{row.targetPrice && row.currentPrice ? signedPct(row.gapRate) : "-"}</strong></div>
+                    <div><span>Hedef pay</span><strong>{row.item.targetWeight ? pct(row.item.targetWeight) : "-"}</strong></div>
+                  </div>
+                  {row.item.note ? <p className="watch-note">{row.item.note}</p> : null}
+                  <div className="watch-meta">
+                    <span>{row.item.priceSource} / {row.item.priceSymbol}</span>
+                    <span>{row.item.lastPriceAt ? formatAge(row.item.lastPriceAt) : "Fiyat kaydi yok"}</span>
+                  </div>
+                  {row.item.lastPriceError ? <div className="form-error">{row.item.lastPriceError}</div> : null}
+                  <div className="watch-actions">
+                    <button className="secondary" onClick={() => void refreshWatchItem(row.item.id)}>Yenile</button>
+                    <button className="secondary" onClick={() => moveWatchItemToAssetDraft(row.item)}>Portfoye aktar</button>
+                    <button className="icon-button" onClick={() => void deleteWatchItem(row.item.id)}>×</button>
+                  </div>
+                </article>
+              )) : (
+                <section className="panel">
+                  <div className="empty">Henuz izleme listesi yok. Almayi dusundugun varliklari buraya ekleyebilirsin.</div>
+                </section>
+              )}
             </section>
           </>
         ) : null}

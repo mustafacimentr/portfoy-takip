@@ -442,6 +442,122 @@ select:focus {
   padding-bottom: 18px;
 }
 
+.watch-form {
+  display: grid;
+  grid-template-columns: 1.1fr 0.8fr 0.7fr 1.5fr auto;
+  gap: 12px;
+  padding: 18px;
+  align-items: end;
+}
+
+.watchlist-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.watch-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  border-top: 3px solid #d8e0ea;
+}
+
+.watch-card.ok {
+  border-top-color: var(--green);
+}
+
+.watch-card.warning {
+  border-top-color: #d19a18;
+}
+
+.watch-card-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.watch-card-head strong {
+  display: block;
+  font-size: 15px;
+}
+
+.watch-card-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.watch-status {
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.watch-status.ok {
+  background: #ddf7ed;
+  color: var(--green);
+}
+
+.watch-status.warning {
+  background: #fff5dc;
+  color: #9c6b00;
+}
+
+.watch-status.muted {
+  background: #eef3f8;
+  color: #526173;
+}
+
+.watch-price-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.watch-price-grid div {
+  background: #f7f9fb;
+  border: 1px solid #e6edf4;
+  border-radius: 8px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.watch-price-grid span,
+.watch-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.watch-price-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.watch-note {
+  margin: 0;
+  color: #31445c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.watch-meta,
+.watch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .visual-body,
 .portfolio-bars,
 .projection-list,
@@ -2654,13 +2770,15 @@ label {
   .benchmark-grid,
   .source-grid,
   .position-story-grid,
+  .watchlist-grid,
   .fund-dataset-list,
   .fund-exposure-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .overlap-grid,
-  .fund-holding-form {
+  .fund-holding-form,
+  .watch-form {
     grid-template-columns: 1fr;
   }
 
@@ -2738,6 +2856,8 @@ label {
   .position-story-grid,
   .sell-strategy-controls,
   .sell-strategy-grid,
+  .watchlist-grid,
+  .watch-price-grid,
   .transaction-story-summary,
   .transaction-form,
   .transaction-form.position-mode,

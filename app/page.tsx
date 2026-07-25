@@ -467,13 +467,11 @@ function logoApiUrl(asset: Asset, code: string) {
 }
 
 function assetLogoUrl(asset: Asset) {
-  if (asset.logoUrl) return asset.logoUrl;
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   if (asset.type === "Nakit" || code === "NAKIT") return "";
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
   if (cryptoBase && cryptoLogoUrls[cryptoBase]) return cryptoLogoUrls[cryptoBase];
   if (cryptoBase) return coinCapIconUrl(cryptoBase);
-  if (directAssetLogoUrls[code]) return directAssetLogoUrls[code];
   const domain = assetLogoDomains[code] || assetLogoDomains[compactCode(asset.priceSymbol || "")];
   if (domain) return faviconUrl(domain);
   if (asset.priceSource === "isportfoy") return faviconUrl("isportfoy.com.tr");
@@ -481,6 +479,8 @@ function assetLogoUrl(asset: Asset) {
   if (asset.priceSource === "tefas") return faviconUrl("tefas.gov.tr");
   if (asset.type === "Hisse" || asset.priceSource === "yahoo") return logoApiUrl(asset, code);
   if (asset.type === "Fon") return logoApiUrl(asset, code);
+  if (directAssetLogoUrls[code]) return directAssetLogoUrls[code];
+  if (asset.logoUrl) return asset.logoUrl;
   return "";
 }
 

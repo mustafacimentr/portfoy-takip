@@ -86,6 +86,7 @@ const stockLogoDomains: Record<string, string> = {
 
 const directStockLogos: Record<string, string> = {
   FROTO: "https://companieslogo.com/img/orig/FROTO.IS-0beb2e34.png?t=1720244491",
+  QNBTR: "https://upload.wikimedia.org/wikipedia/commons/8/8f/QNB_Logo.svg",
   ULKER: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/%C3%9Clker_logo_%282%29.svg/250px-%C3%9Clker_logo_%282%29.svg.png",
 };
 
@@ -170,10 +171,11 @@ export async function GET(request: Request) {
     const tradingView = await tradingViewLogo(code);
     if (tradingView) return redirectImage(tradingView);
 
+    if (directStockLogos[code]) return redirectImage(directStockLogos[code]);
+
     const yahoo = await yahooCompanyLogo(code);
     if (yahoo) return redirectImage(yahoo);
 
-    if (directStockLogos[code]) return redirectImage(directStockLogos[code]);
     if (stockLogoDomains[code]) return redirectImage(favicon(stockLogoDomains[code]));
   } catch {
     // Keep the UI fallback visible if every external logo source fails.

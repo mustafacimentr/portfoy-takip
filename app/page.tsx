@@ -457,6 +457,48 @@ function coinCapIconUrl(symbol: string) {
   return `https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`;
 }
 
+function svgLogoUrl(svg: string) {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function specialAssetLogoUrl(code: string) {
+  if (code === "ALTINS1" || code === "ALTIN") {
+    return svgLogoUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <defs>
+          <linearGradient id="g" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#fff3b0"/>
+            <stop offset=".46" stop-color="#d9a51c"/>
+            <stop offset="1" stop-color="#8a5a09"/>
+          </linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="29" fill="#fff8dd" stroke="#d9a51c" stroke-width="3"/>
+        <circle cx="32" cy="32" r="21" fill="url(#g)"/>
+        <path d="M22 39h20l-4-15H26l-4 15Z" fill="#fff1a8" stroke="#8a5a09" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M27 24h10l-2-7h-6l-2 7Z" fill="#ffd96a" stroke="#8a5a09" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+    `);
+  }
+  if (code === "GMSTRF" || code === "GMSTR") {
+    return svgLogoUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <defs>
+          <linearGradient id="s" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#ffffff"/>
+            <stop offset=".5" stop-color="#c6d3e1"/>
+            <stop offset="1" stop-color="#6a7a91"/>
+          </linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="29" fill="#f6f9fc" stroke="#8ba1ba" stroke-width="3"/>
+        <circle cx="32" cy="32" r="21" fill="url(#s)"/>
+        <path d="M20 41h24l-5-16H25l-5 16Z" fill="#f7fbff" stroke="#53657a" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M27 25h12l-3-8h-6l-3 8Z" fill="#dce6f1" stroke="#53657a" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+    `);
+  }
+  return "";
+}
+
 function logoApiUrl(asset: Asset, code: string) {
   const params = new URLSearchParams({
     code,
@@ -470,6 +512,8 @@ function logoApiUrl(asset: Asset, code: string) {
 function assetLogoUrl(asset: Asset) {
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   if (asset.type === "Nakit" || code === "NAKIT") return "";
+  const specialLogo = specialAssetLogoUrl(code);
+  if (specialLogo) return specialLogo;
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
   if (cryptoBase && cryptoLogoUrls[cryptoBase]) return cryptoLogoUrls[cryptoBase];
   if (cryptoBase) return coinCapIconUrl(cryptoBase);

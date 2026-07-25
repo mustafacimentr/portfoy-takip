@@ -10,6 +10,47 @@ function redirectImage(url: string) {
   return Response.redirect(url, 302);
 }
 
+function svgImage(svg: string) {
+  return new Response(svg, {
+    headers: {
+      "content-type": "image/svg+xml; charset=utf-8",
+      "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+    },
+  });
+}
+
+function seededColor(code: string) {
+  let hash = 0;
+  for (const char of code) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  const palette = ["#123a6f", "#006b5f", "#a0183f", "#d18b00", "#145c9e", "#2f6b3f", "#6d4fc2", "#b43b2d"];
+  return palette[hash % palette.length];
+}
+
+function brandedFallback(code: string) {
+  const label = code.slice(0, Math.min(3, Math.max(2, code.length)));
+  const color = seededColor(code);
+  return svgImage(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+      <circle cx="64" cy="64" r="58" fill="#f4f7fb" stroke="${color}" stroke-width="7"/>
+      <circle cx="64" cy="64" r="44" fill="${color}"/>
+      <text x="64" y="72" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" fill="#fff">${label}</text>
+    </svg>
+  `);
+}
+
+function qnbLogo() {
+  return svgImage(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+      <circle cx="64" cy="64" r="58" fill="#f4f7fb"/>
+      <g transform="translate(64 64)">
+        <path d="M0-43 10-24 30-37 23-14 45-10 24 0 45 10 23 14 30 37 10 24 0 43-10 24-30 37-23 14-45 10-24 0-45-10-23-14-30-37-10-24Z" fill="#0a4f86"/>
+        <path d="M-29-44-6-19 0-30 6-19 29-44 41-32 10 1H-10L-41-32Z" fill="#b00555"/>
+        <circle r="14" fill="#f4f7fb"/>
+      </g>
+    </svg>
+  `);
+}
+
 function hostFromUrl(value?: string) {
   if (!value) return "";
   try {
@@ -40,6 +81,7 @@ const fundLogoDomains: Record<string, string> = {
 
 const stockLogoDomains: Record<string, string> = {
   AKBNK: "akbank.com",
+  AEFES: "anadoluefes.com.tr",
   AKSA: "aksa.com",
   AKSEN: "aksen.com.tr",
   ALARK: "alarko.com.tr",
@@ -159,6 +201,8 @@ export async function GET(request: Request) {
 
   const headers = { "cache-control": "public, max-age=86400, stale-while-revalidate=604800" };
   try {
+    if (code === "QNBTR") return qnbLogo();
+
     if (type.includes("kripto") || source === "binance") {
       const base = code.replace(/(TRY|USDT|USD|EUR)$/i, "");
       const logo = await coinGeckoLogo(base);
@@ -168,18 +212,18 @@ export async function GET(request: Request) {
       const domain = fundLogoDomains[code] || (source === "akportfoy" ? "akportfoy.com.tr" : source === "isportfoy" ? "isportfoy.com.tr" : "tefas.gov.tr");
       return redirectImage(favicon(domain));
     }
-    const tradingView = await tradingViewLogo(code);
-    if (tradingView) return redirectImage(tradingView);
-
     if (directStockLogos[code]) return redirectImage(directStockLogos[code]);
+
+    if (stockLogoDomains[code]) return redirectImage(favicon(stockLogoDomains[code]));
 
     const yahoo = await yahooCompanyLogo(code);
     if (yahoo) return redirectImage(yahoo);
 
-    if (stockLogoDomains[code]) return redirectImage(favicon(stockLogoDomains[code]));
+    const tradingView = await tradingViewLogo(code);
+    if (tradingView) return redirectImage(tradingView);
   } catch {
     // Keep the UI fallback visible if every external logo source fails.
   }
 
-  return new Response("Logo not found", { status: 404, headers });
+  return brandedFallback(code);
 }

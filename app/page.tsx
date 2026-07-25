@@ -374,6 +374,7 @@ const assetLogoDomains: Record<string, string> = {
   KPH: "isportfoy.com.tr",
   TUPRS: "tupras.com.tr",
   FROTO: "fordotosan.com.tr",
+  AEFES: "anadoluefes.com.tr",
   BIMAS: "bim.com.tr",
   VAKBN: "vakifbank.com.tr",
   TAVHL: "tavhavalimanlari.com.tr",
@@ -498,7 +499,7 @@ function logoApiUrl(asset: Asset, code: string) {
     code,
     type: asset.type || "",
     source: asset.priceSource || "",
-    v: "4",
+    v: "5",
   });
   return `/api/logo?${params.toString()}`;
 }

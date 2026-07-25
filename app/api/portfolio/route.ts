@@ -13,6 +13,7 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => ({}));
   await writePortfolio({
     assets: Array.isArray(body.state?.assets) ? body.state.assets : [],
+    watchlist: Array.isArray(body.state?.watchlist) ? body.state.watchlist : [],
     transactions: Array.isArray(body.state?.transactions) ? body.state.transactions : [],
     history: Array.isArray(body.state?.history) ? body.state.history : [],
     cashFlows: Array.isArray(body.state?.cashFlows) ? body.state.cashFlows : [],

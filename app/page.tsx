@@ -300,7 +300,7 @@ const menuItems = [
   { key: "distribution", label: "Portfoy Dagilimi", description: "Varlik sinifi, toplam paylar ve mevcut varlik listen." },
   { key: "performance", label: "Performans Gecmisi", description: "Portfoy degerinin zaman icindeki degisimi ve nakit akisi." },
   { key: "targets", label: "Hedef Portfoy", description: "Hedef oranlar, sapmalar ve yeni yatirim dagitim onerisi." },
-  { key: "watchlist", label: "Alim Firsatlari", description: "Portfoye eklemeden once takip etmek istedigin varliklar ve hedef fiyatlar." },
+  { key: "watchlist", label: "Izleme Listesi", description: "Portfoye eklemeden once takip etmek istedigin varliklar ve hedef fiyatlar." },
   { key: "comparison", label: "Karsilastirma", description: "Portfoy getirini BIST, altin, doviz, Bitcoin ve global endekslerle karsilastir." },
   { key: "fundOverlap", label: "Fon Icerik & Ortusme", description: "Fonlarin ic varliklarini, ortak pozisyonlarini ve dolayli maruziyeti analiz et." },
   { key: "dataStatus", label: "Veri Durumu", description: "Fiyat kaynaklari, son guncelleme ve hata sagligi." },
@@ -360,8 +360,9 @@ const cryptoLogoUrls: Record<string, string> = {
 const directAssetLogoUrls: Record<string, string> = {
   FROTO: "https://companieslogo.com/img/orig/FROTO.IS-0beb2e34.png?t=1720244491",
   ULKER: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/%C3%9Clker_logo_%282%29.svg/250px-%C3%9Clker_logo_%282%29.svg.png",
-  GARAN: "https://www.garantibbvainvestorrelations.com/favicon.ico",
-  ASELS: "https://www.aselsan.com/assets/images/favicon.ico",
+  GARAN: "https://www.google.com/s2/favicons?domain=garantibbva.com.tr&sz=64",
+  ASELS: "https://www.google.com/s2/favicons?domain=aselsan.com&sz=64",
+  AFT: "https://www.google.com/s2/favicons?domain=akportfoy.com.tr&sz=64",
 };
 const assetLogoDomains: Record<string, string> = {
   ALTINS1: "darphane.gov.tr",
@@ -2294,9 +2295,18 @@ export default function Home() {
     return { ...nextState, settings: { ...nextSettings, fundHoldings } };
   }
 
-  async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean; preserveFundHoldings?: boolean } = {}) {
+  async function savePortfolio(nextState: PortfolioState, options: { snapshot?: boolean; preserveFundHoldings?: boolean; preserveWatchlist?: boolean } = {}) {
     const shouldSnapshot = options.snapshot !== false;
-    const protectedState = options.preserveFundHoldings ? withLatestFundHoldings(nextState) : nextState;
+    const latestWatchlist = (stateRef.current.watchlist || []).map(normalizeWatchItem);
+    const watchlistProtectedState = options.preserveWatchlist === false
+      ? nextState
+      : {
+          ...nextState,
+          watchlist: latestWatchlist.length > (nextState.watchlist || []).length
+            ? latestWatchlist
+            : (nextState.watchlist || []).map(normalizeWatchItem),
+        };
+    const protectedState = options.preserveFundHoldings ? withLatestFundHoldings(watchlistProtectedState) : watchlistProtectedState;
     const repairedState = repairPortfolioState(protectedState);
     const finalState = shouldSnapshot ? withTodaySnapshot(repairedState) : repairedState;
     setState(finalState);
@@ -2342,7 +2352,7 @@ export default function Home() {
         }),
       );
       const benchmarkHistory = await collectBenchmarkHistory(state.benchmarkHistory);
-      await savePortfolio({ ...state, assets: updated, watchlist: updatedWatchlist, benchmarkHistory }, { preserveFundHoldings: true });
+      await savePortfolio({ ...state, assets: updated, watchlist: updatedWatchlist, benchmarkHistory }, { preserveFundHoldings: true, preserveWatchlist: false });
     } finally {
       setLoading(false);
     }
@@ -2407,7 +2417,7 @@ export default function Home() {
     } catch (error) {
       item = normalizeWatchItem({ ...item, lastPriceError: error instanceof Error ? error.message : "Fiyat alinamadi" });
     }
-    await savePortfolio({ ...state, watchlist: [...(state.watchlist || []).map(normalizeWatchItem), item] }, { snapshot: false, preserveFundHoldings: true });
+    await savePortfolio({ ...state, watchlist: [...(state.watchlist || []).map(normalizeWatchItem), item] }, { snapshot: false, preserveFundHoldings: true, preserveWatchlist: false });
     setWatchDraft({ ticker: "", targetPrice: "", targetWeight: "", note: "" });
   }
 
@@ -2426,7 +2436,7 @@ export default function Home() {
       await savePortfolio({
         ...state,
         watchlist: (state.watchlist || []).map((item) => item.id === id ? nextItem : normalizeWatchItem(item)),
-      }, { snapshot: false, preserveFundHoldings: true });
+      }, { snapshot: false, preserveFundHoldings: true, preserveWatchlist: false });
     } finally {
       setLoading(false);
     }
@@ -2436,7 +2446,7 @@ export default function Home() {
     await savePortfolio({
       ...state,
       watchlist: (state.watchlist || []).filter((item) => item.id !== id).map(normalizeWatchItem),
-    }, { snapshot: false, preserveFundHoldings: true });
+    }, { snapshot: false, preserveFundHoldings: true, preserveWatchlist: false });
   }
 
   function moveWatchItemToAssetDraft(item: WatchItem) {
@@ -2967,7 +2977,7 @@ export default function Home() {
       const nextState = file.name.toLowerCase().endsWith(".csv")
         ? parseCsvBackup(text)
         : parseJsonBackup(text);
-      await savePortfolio(nextState);
+      await savePortfolio(nextState, { preserveWatchlist: false });
       alert(`${nextState.assets.length} varlik bulut portfoyune aktarildi.`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "Dosya iceri aktarilamadi.");
@@ -3261,7 +3271,7 @@ export default function Home() {
     return (
       <main className="login-shell">
         <section className="login-card">
-          <div className="mark">PF</div>
+          <img className="profile-mark login-profile-mark" src="/mustafa-cimen.jpg" alt="Mustafa Cimen" />
           <h1>{needsSetup ? "Kisisel portfoy sifreni olustur" : "Portfoyune giris yap"}</h1>
           <p>
             {needsSetup
@@ -3300,10 +3310,10 @@ export default function Home() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="mark">PF</div>
+          <img className="profile-mark" src="/mustafa-cimen.jpg" alt="Mustafa Cimen" />
           <div>
-            <strong>Portfoy Takip</strong>
-            <span>Kisisel bulut paneli</span>
+            <strong>Mustafa Cimen Portfoy Takip</strong>
+            <span>Mustafa Cimen Portfoy Paneli</span>
           </div>
         </div>
         <nav className="side-menu" aria-label="Portfoy bolumleri">
@@ -3727,7 +3737,7 @@ export default function Home() {
             <section className="panel watch-form-panel">
               <div className="panel-header compact">
                 <div>
-                  <h2>Alim Firsati / Izleme Listesi</h2>
+                  <h2>Izleme Listesi</h2>
                   <p>Portfoye eklemeden once fiyatini, hedef seviyeni ve notunu takip et.</p>
                 </div>
               </div>

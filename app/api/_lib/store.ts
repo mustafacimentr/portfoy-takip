@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 
 export type PortfolioState = {
   assets: unknown[];
+  watchlist?: unknown[];
   transactions: unknown[];
   history?: unknown[];
   cashFlows?: unknown[];
@@ -11,6 +12,7 @@ export type PortfolioState = {
 
 export const defaultState: PortfolioState = {
   assets: [],
+  watchlist: [],
   transactions: [],
   history: [],
   cashFlows: [],

@@ -122,6 +122,24 @@ button:hover,
   font-weight: 900;
 }
 
+.profile-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: cover;
+  object-position: 50% 68%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  flex: 0 0 auto;
+}
+
+.login-profile-mark {
+  width: 52px;
+  height: 52px;
+  border-color: rgba(15, 23, 32, 0.12);
+  box-shadow: 0 14px 28px rgba(15, 23, 32, 0.16);
+}
+
 .brand strong {
   display: block;
   font-size: 17px;

@@ -533,6 +533,52 @@ select:focus {
   color: #526173;
 }
 
+.logo-editor-panel {
+  overflow: hidden;
+}
+
+.logo-editor-form {
+  display: grid;
+  grid-template-columns: 0.55fr 1.4fr 0.9fr auto auto;
+  gap: 12px;
+  padding: 18px;
+  align-items: end;
+}
+
+.logo-preview-strip {
+  border-top: 1px solid var(--line);
+  background: #f7f9fc;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+}
+
+.logo-preview-strip span:first-child {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 900;
+}
+
+.logo-preview-strip small {
+  color: var(--muted);
+}
+
+.logo-catalog-table {
+  min-width: 920px;
+}
+
+.logo-catalog-table td:nth-child(4) strong {
+  display: block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .watch-price-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2815,7 +2861,8 @@ label {
 
   .overlap-grid,
   .fund-holding-form,
-  .watch-form {
+  .watch-form,
+  .logo-editor-form {
     grid-template-columns: 1fr;
   }
 
@@ -2896,6 +2943,7 @@ label {
   .watchlist-grid,
   .watch-price-grid,
   .watch-period-grid,
+  .logo-editor-form,
   .transaction-story-summary,
   .transaction-form,
   .transaction-form.position-mode,

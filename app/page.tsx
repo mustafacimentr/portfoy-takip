@@ -53,6 +53,14 @@ type WatchPricePoint = {
   price: number;
 };
 
+type LogoCatalogEntry = {
+  url: string;
+  source?: string;
+  updatedAt?: string;
+};
+
+type LogoCatalog = Record<string, LogoCatalogEntry>;
+
 type Transaction = {
   id: string;
   assetId: string;
@@ -126,6 +134,7 @@ type PortfolioState = {
   history: PortfolioSnapshot[];
   cashFlows: CashFlow[];
   benchmarkHistory: BenchmarkPoint[];
+  logoCatalog: LogoCatalog;
   settings: PortfolioSettings;
 };
 
@@ -268,6 +277,7 @@ const emptyState: PortfolioState = {
   history: [],
   cashFlows: [],
   benchmarkHistory: [],
+  logoCatalog: {},
   settings: defaultSettings,
 };
 
@@ -304,6 +314,7 @@ const menuItems = [
   { key: "comparison", label: "Karsilastirma", description: "Portfoy getirini BIST, altin, doviz, Bitcoin ve global endekslerle karsilastir." },
   { key: "fundOverlap", label: "Fon Icerik & Ortusme", description: "Fonlarin ic varliklarini, ortak pozisyonlarini ve dolayli maruziyeti analiz et." },
   { key: "dataStatus", label: "Veri Durumu", description: "Fiyat kaynaklari, son guncelleme ve hata sagligi." },
+  { key: "logoCatalog", label: "Logo Katalogu", description: "Varlik logolarini otomatik kaynaklar ve kalici duzeltmelerle yonet." },
   { key: "alerts", label: "Uyarilar", description: "Hedef sapmalari, fiyat veri sorunlari ve risk sinyalleri." },
   { key: "projection", label: "Gelecek Projeksiyonu", description: "Uzun vadeli, yil yil buyume senaryosu." },
   { key: "analytics", label: "Portfoy Analitigi", description: "Sinif dengesi, en iyi ve en zayif performanslar." },
@@ -504,9 +515,28 @@ function logoApiUrl(asset: Asset, code: string) {
   return `/api/logo?${params.toString()}`;
 }
 
-function assetLogoUrl(asset: Asset) {
+function logoCatalogKey(value: string) {
+  return compactCode(value);
+}
+
+function assetLogoCatalogKey(asset: Asset) {
+  return logoCatalogKey(asset.ticker || asset.priceSymbol || asset.name || "");
+}
+
+function logoCatalogLookup(catalog: LogoCatalog | undefined, asset: Asset) {
+  const keys = [asset.ticker, asset.priceSymbol, asset.name].map(logoCatalogKey).filter(Boolean);
+  for (const key of keys) {
+    const entry = catalog?.[key];
+    if (entry?.url) return entry.url;
+  }
+  return "";
+}
+
+function assetLogoUrl(asset: Asset, logoCatalog?: LogoCatalog) {
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   if (asset.type === "Nakit" || code === "NAKIT") return "";
+  const catalogLogo = logoCatalogLookup(logoCatalog, asset);
+  if (catalogLogo) return catalogLogo;
   const specialLogo = specialAssetLogoUrl(code);
   if (specialLogo) return specialLogo;
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
@@ -524,8 +554,8 @@ function assetLogoUrl(asset: Asset) {
   return "";
 }
 
-function AssetLogo({ asset, color, small = false }: { asset: Asset; color: string; small?: boolean }) {
-  const logoUrl = assetLogoUrl(asset);
+function AssetLogo({ asset, color, small = false, logoCatalog }: { asset: Asset; color: string; small?: boolean; logoCatalog?: LogoCatalog }) {
+  const logoUrl = assetLogoUrl(asset, logoCatalog);
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
   const isCash = asset.type === "Nakit" || code === "NAKIT";
   return (
@@ -897,6 +927,7 @@ function repairPortfolioState(input: PortfolioState): PortfolioState {
     history: (input.history || []).map(normalizeSnapshot),
     cashFlows: (input.cashFlows || []).map(normalizeCashFlow),
     benchmarkHistory: (input.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+    logoCatalog: normalizeLogoCatalog(input.logoCatalog),
     settings: normalizeSettings(input.settings),
   };
   const assetsById = new Map(normalizedState.assets.map((asset) => [asset.id, asset]));
@@ -1160,6 +1191,22 @@ function normalizeWatchItem(item: Partial<WatchItem>): WatchItem {
   };
 }
 
+function normalizeLogoCatalog(input?: LogoCatalog | Record<string, unknown>): LogoCatalog {
+  return Object.entries(input || {}).reduce<LogoCatalog>((catalog, [rawKey, rawValue]) => {
+    const key = logoCatalogKey(rawKey);
+    if (!key) return catalog;
+    const value = rawValue as Partial<LogoCatalogEntry> | string;
+    const url = typeof value === "string" ? value : String(value?.url || "");
+    if (!url.trim()) return catalog;
+    catalog[key] = {
+      url: url.trim(),
+      source: typeof value === "string" ? "Katalog" : value.source || "Katalog",
+      updatedAt: typeof value === "string" ? undefined : value.updatedAt,
+    };
+    return catalog;
+  }, {});
+}
+
 function watchItemAsAsset(item: WatchItem): Asset {
   return normalizeAsset({
     id: item.id,
@@ -1273,6 +1320,7 @@ export default function Home() {
   const [quickSellDraft, setQuickSellDraft] = useState({ assetId: "", quantity: "", price: "", amount: "", fee: "", date: plainDate(), note: "" });
   const [sellStrategyDraft, setSellStrategyDraft] = useState({ quantity: "", amount: "", price: "" });
   const [watchDraft, setWatchDraft] = useState({ ticker: "", targetPrice: "", targetWeight: "", note: "" });
+  const [logoDraft, setLogoDraft] = useState({ code: "", url: "", source: "" });
   const [fundHoldingDraft, setFundHoldingDraft] = useState({ fundCode: "", symbol: "", name: "", weight: "", sector: "", country: "" });
   const [fundSyncStatus, setFundSyncStatus] = useState("");
   const [lastSync, setLastSync] = useState("");
@@ -1671,6 +1719,37 @@ export default function Home() {
     const errors = watchRows.filter((row) => row.item.lastPriceError).length;
     return { total: watchRows.length, buyZone: buyZone.length, errors, closest };
   }, [watchRows]);
+
+  const logoCatalogRows = useMemo(() => {
+    const map = new Map<string, { key: string; asset: Asset; location: string; catalog?: LogoCatalogEntry; currentUrl: string }>();
+    const addAsset = (asset: Asset, location: string) => {
+      const normalized = normalizeAsset(asset);
+      const key = assetLogoCatalogKey(normalized);
+      if (!key || normalized.type === "Nakit") return;
+      const catalog = state.logoCatalog?.[key];
+      const existing = map.get(key);
+      const currentUrl = assetLogoUrl(normalized, state.logoCatalog);
+      if (existing) {
+        existing.location = existing.location.includes(location) ? existing.location : `${existing.location}, ${location}`;
+        existing.catalog = existing.catalog || catalog;
+        existing.currentUrl = existing.currentUrl || currentUrl;
+        return;
+      }
+      map.set(key, { key, asset: normalized, location, catalog, currentUrl });
+    };
+    state.assets.forEach((asset) => addAsset(asset, "Portfoy"));
+    (state.watchlist || []).map(normalizeWatchItem).forEach((item) => addAsset(watchItemAsAsset(item), "Izleme"));
+    return Array.from(map.values()).sort((left, right) => {
+      if (Boolean(right.catalog) !== Boolean(left.catalog)) return Number(Boolean(right.catalog)) - Number(Boolean(left.catalog));
+      return left.key.localeCompare(right.key);
+    });
+  }, [state.assets, state.logoCatalog, state.watchlist]);
+
+  const logoCatalogSummary = useMemo(() => {
+    const saved = logoCatalogRows.filter((row) => row.catalog?.url).length;
+    const missing = logoCatalogRows.filter((row) => !row.currentUrl).length;
+    return { total: logoCatalogRows.length, saved, auto: Math.max(0, logoCatalogRows.length - saved - missing), missing };
+  }, [logoCatalogRows]);
 
   const bestAsset = useMemo(() => {
     return portfolioRows.filter((row) => row.cost > 0).sort((left, right) => right.returnRate - left.returnRate)[0];
@@ -2345,6 +2424,7 @@ export default function Home() {
       history: (data.state.history || []).map(normalizeSnapshot),
       cashFlows: (data.state.cashFlows || []).map(normalizeCashFlow),
       benchmarkHistory: (data.state.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+      logoCatalog: normalizeLogoCatalog(data.state.logoCatalog),
       settings: normalizeSettings(data.state.settings),
     });
     setState(loadedState);
@@ -2361,6 +2441,7 @@ export default function Home() {
         watchlist: (nextState.watchlist || []).map(normalizeWatchItem),
         cashFlows: nextState.cashFlows || [],
         benchmarkHistory: (nextState.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+        logoCatalog: normalizeLogoCatalog(nextState.logoCatalog),
         settings: normalizeSettings(nextState.settings),
       };
     }
@@ -2383,6 +2464,7 @@ export default function Home() {
       watchlist: (nextState.watchlist || []).map(normalizeWatchItem),
       cashFlows: (nextState.cashFlows || []).map(normalizeCashFlow),
       benchmarkHistory: (nextState.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+      logoCatalog: normalizeLogoCatalog(nextState.logoCatalog),
       settings: normalizeSettings(nextState.settings),
     };
   }
@@ -2587,6 +2669,69 @@ export default function Home() {
   async function resetDismissedAlerts() {
     const settings = normalizeSettings(state.settings);
     await savePortfolio({ ...state, settings: { ...settings, dismissedAlertIds: [] } }, { snapshot: false });
+  }
+
+  function selectLogoCatalogRow(asset: Asset) {
+    const key = assetLogoCatalogKey(asset);
+    const catalog = state.logoCatalog?.[key];
+    setLogoDraft({
+      code: key,
+      url: catalog?.url || asset.logoUrl || assetLogoUrl(asset, state.logoCatalog),
+      source: catalog?.source || "Manuel duzeltme",
+    });
+  }
+
+  async function saveLogoCatalogEntry(event: FormEvent) {
+    event.preventDefault();
+    const key = logoCatalogKey(logoDraft.code);
+    const url = logoDraft.url.trim();
+    if (!key || !url) {
+      alert("Logo icin kod ve URL gerekli.");
+      return;
+    }
+    const entry: LogoCatalogEntry = {
+      url,
+      source: logoDraft.source.trim() || "Manuel duzeltme",
+      updatedAt: new Date().toISOString(),
+    };
+    const logoCatalog = normalizeLogoCatalog({ ...state.logoCatalog, [key]: entry });
+    const applyToAsset = (asset: Asset) => {
+      const keys = [asset.ticker, asset.priceSymbol, asset.name].map(logoCatalogKey);
+      return keys.includes(key) ? { ...asset, logoUrl: url } : asset;
+    };
+    const applyToWatchItem = (item: WatchItem) => {
+      const keys = [item.ticker, item.priceSymbol, item.name].map(logoCatalogKey);
+      return keys.includes(key) ? { ...item, logoUrl: url } : item;
+    };
+    await savePortfolio({
+      ...state,
+      logoCatalog,
+      assets: state.assets.map((asset) => normalizeAsset(applyToAsset(asset))),
+      watchlist: (state.watchlist || []).map((item) => normalizeWatchItem(applyToWatchItem(item))),
+    }, { snapshot: false, preserveFundHoldings: true, preserveWatchlist: false });
+    setLogoDraft({ code: key, url, source: entry.source || "" });
+  }
+
+  async function removeLogoCatalogEntry(keyValue = logoDraft.code) {
+    const key = logoCatalogKey(keyValue);
+    if (!key) return;
+    const logoCatalog = normalizeLogoCatalog(state.logoCatalog);
+    delete logoCatalog[key];
+    const clearAssetLogo = (asset: Asset) => {
+      const keys = [asset.ticker, asset.priceSymbol, asset.name].map(logoCatalogKey);
+      return keys.includes(key) ? { ...asset, logoUrl: "" } : asset;
+    };
+    const clearWatchLogo = (item: WatchItem) => {
+      const keys = [item.ticker, item.priceSymbol, item.name].map(logoCatalogKey);
+      return keys.includes(key) ? { ...item, logoUrl: "" } : item;
+    };
+    await savePortfolio({
+      ...state,
+      logoCatalog,
+      assets: state.assets.map((asset) => normalizeAsset(clearAssetLogo(asset))),
+      watchlist: (state.watchlist || []).map((item) => normalizeWatchItem(clearWatchLogo(item))),
+    }, { snapshot: false, preserveFundHoldings: true, preserveWatchlist: false });
+    if (logoCatalogKey(logoDraft.code) === key) setLogoDraft({ code: "", url: "", source: "" });
   }
 
   async function submitAsset(event: FormEvent) {
@@ -3096,6 +3241,7 @@ export default function Home() {
       history: (data.history || []).map(normalizeSnapshot),
       cashFlows: (data.cashFlows || []).map(normalizeCashFlow),
       benchmarkHistory: (data.benchmarkHistory || []).map(normalizeBenchmarkPoint),
+      logoCatalog: normalizeLogoCatalog(data.logoCatalog),
       settings: normalizeSettings(data.settings),
     };
   }
@@ -3128,7 +3274,7 @@ export default function Home() {
     }).filter((asset) => asset.ticker && asset.quantity > 0);
 
     if (!assets.length) throw new Error("CSV dosyasinda aktarilacak varlik bulunamadi");
-    return { assets, watchlist: [], transactions: [], history: [], cashFlows: [], benchmarkHistory: [], settings: defaultSettings };
+    return { assets, watchlist: [], transactions: [], history: [], cashFlows: [], benchmarkHistory: [], logoCatalog: {}, settings: defaultSettings };
   }
 
   function normalizeHeader(value: string) {
@@ -3521,7 +3667,7 @@ export default function Home() {
             <div className="portfolio-bars">
               {portfolioRows.map((row) => (
                 <div className="portfolio-bar-row" key={row.asset.id}>
-                  <AssetLogo asset={row.asset} color={row.color} />
+                  <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={row.color} />
                   <strong>{row.asset.ticker}</strong>
                   <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, row.share)}%`, background: row.color }} /></div>
                   <span>{pct(row.share)}</span>
@@ -3812,7 +3958,7 @@ export default function Home() {
                   const targetHint = row.targetShare > 0 ? `Hedef pay ${pct(row.targetShare)}` : row.reason;
                   return (
                     <div className="asset-target-row" key={`${row.groupKey}-${row.asset.id}`}>
-                      <AssetLogo asset={row.asset} color={row.color} />
+                      <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={row.color} />
                       <div>
                         <strong>{row.asset.ticker}</strong>
                         <small>{row.groupLabel} · {targetHint}</small>
@@ -3887,7 +4033,7 @@ export default function Home() {
               {watchRows.length ? watchRows.map((row) => (
                 <article className={`watch-card ${row.status.tone}`} key={row.item.id}>
                   <div className="watch-card-head">
-                    <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} />
+                    <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} />
                     <div>
                       <strong>{row.item.ticker}</strong>
                       <span>{row.item.name}</span>
@@ -4145,7 +4291,7 @@ export default function Home() {
                   return (
                     <article className="fund-dataset-card" key={fundRow.asset.id}>
                       <div className="fund-dataset-head">
-                        <AssetLogo asset={fundRow.asset} color={groupColors.fund} />
+                        <AssetLogo logoCatalog={state.logoCatalog} asset={fundRow.asset} color={groupColors.fund} />
                         <div><strong>{code}</strong><small>{holdings.length} kayit · {sourceText}{asOfText} · Fon degeri {money(fundRow.value)}</small></div>
                         <button className="secondary mini-action" onClick={() => void syncFundHoldings(code)} disabled={loading} type="button">Yenile</button>
                       </div>
@@ -4231,7 +4377,7 @@ export default function Home() {
                       <tr key={row.asset.id}>
                         <td>
                           <button className="asset-name asset-detail-trigger" onClick={() => openAssetDetail(row.asset)} title="Varlik detayini ac">
-                            <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small />
+                            <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small />
                             <div>
                               <strong>{row.asset.ticker}</strong>
                               <small>{row.asset.name}</small>
@@ -4252,6 +4398,106 @@ export default function Home() {
                       </tr>
                     )) : (
                       <tr><td colSpan={6}><div className="empty">Henuz takip edilen varlik yok.</div></td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "logoCatalog" ? (
+          <>
+            <section className="insights-grid logo-kpis">
+              <article className="insight-card"><span>Takip edilen kod</span><strong>{logoCatalogSummary.total}</strong><small>Portfoy ve izleme listesi</small></article>
+              <article className="insight-card green"><span>Katalog kaydi</span><strong>{logoCatalogSummary.saved}</strong><small>Manuel dogrulanmis logo</small></article>
+              <article className="insight-card"><span>Otomatik logo</span><strong>{logoCatalogSummary.auto}</strong><small>Kaynaklardan okunuyor</small></article>
+              <article className={logoCatalogSummary.missing ? "insight-card red" : "insight-card green"}><span>Eksik</span><strong>{logoCatalogSummary.missing}</strong><small>Duzeltme bekleyen</small></article>
+            </section>
+
+            <section className="panel logo-editor-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Logo Duzeltme Paneli</h2>
+                  <p>Otomatik logo yanlis veya eksik gelirse kodu sec, dogru logo URL'sini kaydet.</p>
+                </div>
+              </div>
+              <form className="logo-editor-form" onSubmit={(event) => void saveLogoCatalogEntry(event)}>
+                <label>Kod
+                  <input
+                    className="input"
+                    placeholder="KCHOL, QNBTR, ALTNY..."
+                    value={logoDraft.code}
+                    onChange={(event) => setLogoDraft({ ...logoDraft, code: event.target.value.toUpperCase() })}
+                  />
+                </label>
+                <label>Logo URL
+                  <input
+                    className="input"
+                    placeholder="https://.../logo.svg veya https://.../logo.png"
+                    value={logoDraft.url}
+                    onChange={(event) => setLogoDraft({ ...logoDraft, url: event.target.value })}
+                  />
+                </label>
+                <label>Kaynak notu
+                  <input
+                    className="input"
+                    placeholder="Sirket sitesi, Wikimedia, TradingView..."
+                    value={logoDraft.source}
+                    onChange={(event) => setLogoDraft({ ...logoDraft, source: event.target.value })}
+                  />
+                </label>
+                <button className="primary">Kaydet</button>
+                <button className="secondary" type="button" onClick={() => void removeLogoCatalogEntry()} disabled={!logoDraft.code}>Otomatige don</button>
+              </form>
+              <div className="logo-preview-strip">
+                <span>Onizleme</span>
+                <span className="asset-logo logo-preview-logo" style={{ background: "#193a6a" }}>
+                  <span className="logo-fallback">{logoCatalogKey(logoDraft.code).slice(0, 2) || "LG"}</span>
+                  {logoDraft.url ? <img src={logoDraft.url} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
+                </span>
+                <strong>{logoCatalogKey(logoDraft.code) || "Kod bekleniyor"}</strong>
+                <small>{logoDraft.url ? "Bu logo katalogdan kullanilacak." : "Bir logo URL'si gir."}</small>
+              </div>
+            </section>
+
+            <section className="panel logo-catalog-panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>Logo Katalogu</h2>
+                  <p>Portfoy ve izleme listesindeki tum kodlar; katalog kaydi olanlar once kullanilir.</p>
+                </div>
+              </div>
+              <div className="table-scroll">
+                <table className="logo-catalog-table">
+                  <thead>
+                    <tr><th>Varlik</th><th>Konum</th><th>Durum</th><th>Kaynak</th><th /></tr>
+                  </thead>
+                  <tbody>
+                    {logoCatalogRows.length ? logoCatalogRows.map((row) => (
+                      <tr key={row.key}>
+                        <td>
+                          <button className="asset-name asset-detail-trigger" onClick={() => selectLogoCatalogRow(row.asset)} title="Logoyu duzelt">
+                            <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small />
+                            <div>
+                              <strong>{row.asset.ticker}</strong>
+                              <small>{row.asset.name}</small>
+                            </div>
+                          </button>
+                        </td>
+                        <td><span className="source-label">{row.location}</span></td>
+                        <td><span className={`data-status-badge ${row.catalog?.url ? "ok" : row.currentUrl ? "manual" : "error"}`}>{row.catalog?.url ? "Katalog" : row.currentUrl ? "Otomatik" : "Eksik"}</span></td>
+                        <td>
+                          <strong>{row.catalog?.source || (row.currentUrl ? "Otomatik kaynak" : "-")}</strong>
+                          <small className="muted-block">{row.catalog?.updatedAt ? `Son duzeltme ${formatTime(row.catalog.updatedAt)}` : row.currentUrl ? "Katalog kaydi yok" : "Logo bulunamadi"}</small>
+                        </td>
+                        <td className="row-actions wide-actions">
+                          <button className="icon-btn text-btn" onClick={() => selectLogoCatalogRow(row.asset)}>Duzelt</button>
+                          <button className="icon-btn text-btn" onClick={() => void removeLogoCatalogEntry(row.key)} disabled={!row.catalog?.url}>Otomatige don</button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={5}><div className="empty">Logo katalogu icin once portfoye veya izleme listesine varlik ekle.</div></td></tr>
                     )}
                   </tbody>
                 </table>
@@ -4433,7 +4679,7 @@ export default function Home() {
                     <tr>
                       <td>
                         <button className="asset-name asset-detail-trigger" onClick={() => openAssetDetail(asset)} title="Varlik detayini ac">
-                          <AssetLogo asset={asset} color={colors[index % colors.length]} small />
+                          <AssetLogo logoCatalog={state.logoCatalog} asset={asset} color={colors[index % colors.length]} small />
                           <div>
                             <strong>{asset.ticker}</strong>
                             <small>{asset.name} · {asset.priceSource} oto {asset.lastPriceAt ? `· ${formatTime(asset.lastPriceAt)}` : ""}{asset.lastPriceError ? ` · Hata: ${asset.lastPriceError}` : ""}</small>
@@ -4527,7 +4773,7 @@ export default function Home() {
                 <div className="report-top-list">
                   {portfolioRows.slice(0, 5).map((row) => (
                     <div className="report-top-row" key={row.asset.id}>
-                      <AssetLogo asset={row.asset} color={row.color} small />
+                      <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={row.color} small />
                       <strong>{row.asset.ticker}</strong>
                       <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(3, row.share)}%`, background: row.color }} /></div>
                       <span>{pct(row.share)}</span>
@@ -4555,7 +4801,7 @@ export default function Home() {
                         return (
                           <div className="report-radar-row" key={row.asset.id}>
                             <span>{index + 1}</span>
-                            <AssetLogo asset={row.asset} color={row.color} small />
+                            <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={row.color} small />
                             <strong>{row.asset.ticker}</strong>
                             <b className={amount >= 0 ? "positive" : "negative"}>
                               <i className={`trend-triangle ${amount >= 0 ? "up" : "down"}`} />
@@ -4581,7 +4827,7 @@ export default function Home() {
               <div className="portfolio-bars report-bars">
                 {portfolioRows.map((row) => (
                   <div className="portfolio-bar-row" key={row.asset.id}>
-                    <AssetLogo asset={row.asset} color={row.color} />
+                    <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={row.color} />
                     <strong>{row.asset.ticker}</strong>
                     <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, row.share)}%`, background: row.color }} /></div>
                     <span>{pct(row.share)}</span>
@@ -4616,7 +4862,7 @@ export default function Home() {
                         <tr>
                           <td>
                             <span className="report-asset-cell">
-                              <AssetLogo asset={asset} color={groupColors[currentGroupKey] || "#647181"} small />
+                              <AssetLogo logoCatalog={state.logoCatalog} asset={asset} color={groupColors[currentGroupKey] || "#647181"} small />
                               <span><strong>{asset.ticker}</strong><small>{asset.name}</small></span>
                             </span>
                           </td>
@@ -4659,7 +4905,7 @@ export default function Home() {
                         <td>{row.tx.date}</td>
                         <td>
                           <span className="report-asset-cell">
-                            {row.asset ? <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small /> : null}
+                            {row.asset ? <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small /> : null}
                             <span><strong>{row.asset?.ticker || row.tx.assetTicker || row.tx.assetSymbol || "-"}</strong><small>{row.asset?.name || row.tx.assetName || row.tx.note || "-"}</small></span>
                           </span>
                         </td>
@@ -4716,7 +4962,7 @@ export default function Home() {
                       <tr key={row.item.id}>
                         <td>
                           <span className="report-asset-cell">
-                            <AssetLogo asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small />
+                            <AssetLogo logoCatalog={state.logoCatalog} asset={row.asset} color={groupColors[assetGroupKey(row.asset)] || "#647181"} small />
                             <span><strong>{row.item.ticker}</strong><small>{row.item.name}</small></span>
                           </span>
                         </td>
@@ -4948,7 +5194,7 @@ export default function Home() {
                 <input className="input" value={assetDraft.ticker} onChange={(event) => updateDraftTicker(event.target.value)} onBlur={() => void discoverDraftAsset()} placeholder="AFT, THYAO veya SOL/TRY" required />
               </label>
               <div className={`auto-summary asset-match ${assetLookup.loading ? "loading" : assetLookup.ok ? "matched" : ""}`}>
-                {assetDraft.ticker ? <><AssetLogo asset={assetDraft} color={groupColors[assetGroupKey(assetDraft)] || "#647181"} small /><span><strong>{assetDraft.name}</strong><small>{assetDraft.type} · {assetDraft.currency} · Fiyat ve simge otomatik</small></span></> : <span><strong>Varlik kodunu yaz</strong><small>Fon, BIST hissesi veya kripto otomatik taninir.</small></span>}
+                {assetDraft.ticker ? <><AssetLogo logoCatalog={state.logoCatalog} asset={assetDraft} color={groupColors[assetGroupKey(assetDraft)] || "#647181"} small /><span><strong>{assetDraft.name}</strong><small>{assetDraft.type} · {assetDraft.currency} · Fiyat ve simge otomatik</small></span></> : <span><strong>Varlik kodunu yaz</strong><small>Fon, BIST hissesi veya kripto otomatik taninir.</small></span>}
               </div>
               {assetLookup.message ? <div className={`lookup-message wide ${assetLookup.ok ? "success" : ""}`}>{assetLookup.message}</div> : null}
               <label>Adet
@@ -5023,7 +5269,7 @@ export default function Home() {
                   {(() => {
                     const asset = state.assets.find((item) => item.id === quickSellDraft.assetId);
                     if (!asset) return null;
-                    return <><AssetLogo asset={asset} color={groupColors[assetGroupKey(asset)] || "#647181"} small /><span><strong>{asset.ticker}</strong><small>Mevcut adet: {num(asset.quantity)} · Ortalama maliyet: {money(asset.avgCost, asset.currency)}</small></span></>;
+                    return <><AssetLogo logoCatalog={state.logoCatalog} asset={asset} color={groupColors[assetGroupKey(asset)] || "#647181"} small /><span><strong>{asset.ticker}</strong><small>Mevcut adet: {num(asset.quantity)} · Ortalama maliyet: {money(asset.avgCost, asset.currency)}</small></span></>;
                   })()}
                 </div>
               ) : null}
@@ -5060,7 +5306,7 @@ export default function Home() {
           <section className="modal asset-detail-modal">
             <div className="asset-detail-head">
               <div className="asset-detail-title">
-                <AssetLogo asset={selectedAssetDetail.asset} color={groupColors[assetGroupKey(selectedAssetDetail.asset)] || "#647181"} />
+                <AssetLogo logoCatalog={state.logoCatalog} asset={selectedAssetDetail.asset} color={groupColors[assetGroupKey(selectedAssetDetail.asset)] || "#647181"} />
                 <div>
                   <h2>{selectedAssetDetail.asset.ticker}</h2>
                   <p>{selectedAssetDetail.asset.name} · {selectedAssetDetail.group.label}</p>

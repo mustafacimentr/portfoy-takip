@@ -7,6 +7,7 @@ export type PortfolioState = {
   history?: unknown[];
   cashFlows?: unknown[];
   benchmarkHistory?: unknown[];
+  logoCatalog?: Record<string, unknown>;
   settings: { autoRefresh: boolean; targetAllocations?: Record<string, number>; rebalanceAmount?: number };
 };
 
@@ -17,6 +18,7 @@ export const defaultState: PortfolioState = {
   history: [],
   cashFlows: [],
   benchmarkHistory: [],
+  logoCatalog: {},
   settings: { autoRefresh: true, targetAllocations: {}, rebalanceAmount: 50000 },
 };
 

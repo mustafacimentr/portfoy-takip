@@ -57,6 +57,7 @@ type LogoCatalogEntry = {
   url: string;
   source?: string;
   updatedAt?: string;
+  deleted?: boolean;
 };
 
 type LogoCatalog = Record<string, LogoCatalogEntry>;
@@ -1196,6 +1197,10 @@ function normalizeLogoCatalog(input?: LogoCatalog | Record<string, unknown>): Lo
     const key = logoCatalogKey(rawKey);
     if (!key) return catalog;
     const value = rawValue as Partial<LogoCatalogEntry> | string;
+    if (typeof value !== "string" && value?.deleted) {
+      catalog[key] = { url: "", deleted: true, updatedAt: value.updatedAt };
+      return catalog;
+    }
     const url = typeof value === "string" ? value : String(value?.url || "");
     if (!url.trim()) return catalog;
     catalog[key] = {
@@ -1727,15 +1732,16 @@ export default function Home() {
       const key = assetLogoCatalogKey(normalized);
       if (!key || normalized.type === "Nakit") return;
       const catalog = state.logoCatalog?.[key];
+      const visibleCatalog = catalog?.deleted ? undefined : catalog;
       const existing = map.get(key);
       const currentUrl = assetLogoUrl(normalized, state.logoCatalog);
       if (existing) {
         existing.location = existing.location.includes(location) ? existing.location : `${existing.location}, ${location}`;
-        existing.catalog = existing.catalog || catalog;
+        existing.catalog = existing.catalog || visibleCatalog;
         existing.currentUrl = existing.currentUrl || currentUrl;
         return;
       }
-      map.set(key, { key, asset: normalized, location, catalog, currentUrl });
+      map.set(key, { key, asset: normalized, location, catalog: visibleCatalog, currentUrl });
     };
     state.assets.forEach((asset) => addAsset(asset, "Portfoy"));
     (state.watchlist || []).map(normalizeWatchItem).forEach((item) => addAsset(watchItemAsAsset(item), "Izleme"));
@@ -2716,7 +2722,7 @@ export default function Home() {
     const key = logoCatalogKey(keyValue);
     if (!key) return;
     const logoCatalog = normalizeLogoCatalog(state.logoCatalog);
-    delete logoCatalog[key];
+    logoCatalog[key] = { url: "", deleted: true, updatedAt: new Date().toISOString() };
     const clearAssetLogo = (asset: Asset) => {
       const keys = [asset.ticker, asset.priceSymbol, asset.name].map(logoCatalogKey);
       return keys.includes(key) ? { ...asset, logoUrl: "" } : asset;

@@ -76,7 +76,7 @@ function coinCapIcon(symbol: string) {
 }
 
 function logoApi(code: string, type: string, source: string) {
-  const params = new URLSearchParams({ code, type, source, v: "6" });
+  const params = new URLSearchParams({ code, type, source, v: "7" });
   return `/api/logo?${params.toString()}`;
 }
 

@@ -10,6 +10,45 @@ function redirectImage(url: string) {
   return Response.redirect(url, 302);
 }
 
+function absoluteUrl(value: string, base: string) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed || trimmed.startsWith("data:")) return "";
+  try {
+    return new URL(trimmed, base).toString();
+  } catch {
+    return "";
+  }
+}
+
+function readAttr(tag: string, name: string) {
+  return tag.match(new RegExp(`${name}=["']([^"']+)`, "i"))?.[1] || "";
+}
+
+function bestWebsiteLogo(html: string, baseUrl: string) {
+  const candidates: Array<{ url: string; score: number }> = [];
+  for (const tag of html.match(/<link\b[^>]*>/gi) || []) {
+    const rel = readAttr(tag, "rel").toLowerCase();
+    const href = absoluteUrl(readAttr(tag, "href"), baseUrl);
+    if (!href || (!rel.includes("icon") && !rel.includes("apple-touch"))) continue;
+    const text = `${rel} ${href}`.toLowerCase();
+    const score = (rel.includes("apple-touch") ? 40 : 0)
+      + (text.includes("logo") ? 25 : 0)
+      + (text.includes("192") || text.includes("180") || text.includes("512") ? 15 : 0)
+      + (href.endsWith(".svg") ? 10 : 0)
+      - (rel.includes("mask-icon") ? 20 : 0);
+    candidates.push({ url: href, score });
+  }
+  for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+    const key = `${readAttr(tag, "property")} ${readAttr(tag, "name")}`.toLowerCase();
+    const content = absoluteUrl(readAttr(tag, "content"), baseUrl);
+    if (content && /og:image|twitter:image/.test(key)) {
+      candidates.push({ url: content, score: content.toLowerCase().includes("logo") ? 30 : 8 });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0]?.url || "";
+}
+
 function svgImage(svg: string) {
   return new Response(svg, {
     headers: {
@@ -179,7 +218,24 @@ async function yahooCompanyLogo(code: string) {
   const data = await response.json() as any;
   const website = data?.quoteSummary?.result?.[0]?.assetProfile?.website;
   const host = hostFromUrl(website);
-  return host ? favicon(host) : "";
+  return host ? await websiteLogo(host) : "";
+}
+
+async function websiteLogo(domain: string) {
+  const home = `https://${domain}`;
+  try {
+    const response = await fetch(home, {
+      headers: { accept: "text/html,application/xhtml+xml", "user-agent": "Mozilla/5.0" },
+    });
+    if (response.ok) {
+      const html = await response.text();
+      const logo = bestWebsiteLogo(html, response.url || home);
+      if (logo) return logo;
+    }
+  } catch {
+    // Favicon fallback below keeps the logo slot populated when the website blocks scraping.
+  }
+  return favicon(domain);
 }
 
 async function coinGeckoLogo(symbol: string) {
@@ -215,7 +271,7 @@ export async function GET(request: Request) {
     }
     if (directStockLogos[code]) return redirectImage(directStockLogos[code]);
 
-    if (stockLogoDomains[code]) return redirectImage(favicon(stockLogoDomains[code]));
+    if (stockLogoDomains[code]) return redirectImage(await websiteLogo(stockLogoDomains[code]));
 
     const yahoo = await yahooCompanyLogo(code);
     if (yahoo) return redirectImage(yahoo);

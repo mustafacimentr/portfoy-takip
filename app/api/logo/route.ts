@@ -128,6 +128,8 @@ const stockLogoDomains: Record<string, string> = {
 
 const directStockLogos: Record<string, string> = {
   FROTO: "https://companieslogo.com/img/orig/FROTO.IS-0beb2e34.png?t=1720244491",
+  KCHOL: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Ko%C3%A7_Holding_-_logo_%28Turkey%2C_1984%29.svg/250px-Ko%C3%A7_Holding_-_logo_%28Turkey%2C_1984%29.svg.png",
+  KTLEV: "https://www.katilimevim.com.tr/katilimyeni/cdn/uploads/000004883_logo.svg",
   QNBTR: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/QNB_Logo.svg/128px-QNB_Logo.svg.png",
   ULKER: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/%C3%9Clker_logo_%282%29.svg/250px-%C3%9Clker_logo_%282%29.svg.png",
 };
@@ -199,7 +201,6 @@ export async function GET(request: Request) {
   const type = String(searchParams.get("type") || "").toLowerCase();
   if (!code) return new Response("Logo code required", { status: 400 });
 
-  const headers = { "cache-control": "public, max-age=86400, stale-while-revalidate=604800" };
   try {
     if (code === "QNBTR") return qnbLogo();
 

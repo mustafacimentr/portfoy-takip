@@ -535,9 +535,9 @@ function logoCatalogLookup(catalog: LogoCatalog | undefined, asset: Asset) {
 
 function assetLogoUrl(asset: Asset, logoCatalog?: LogoCatalog) {
   const code = compactCode(asset.ticker || asset.priceSymbol || "");
-  if (asset.type === "Nakit" || code === "NAKIT") return "";
   const catalogLogo = logoCatalogLookup(logoCatalog, asset);
   if (catalogLogo) return catalogLogo;
+  if (asset.type === "Nakit" || code === "NAKIT") return "";
   const specialLogo = specialAssetLogoUrl(code);
   if (specialLogo) return specialLogo;
   const cryptoBase = asset.type === "Kripto" || asset.priceSource === "binance" ? cryptoBaseCode(asset.priceSymbol || asset.ticker) : "";
@@ -561,7 +561,9 @@ function AssetLogo({ asset, color, small = false, logoCatalog }: { asset: Asset;
   const isCash = asset.type === "Nakit" || code === "NAKIT";
   return (
     <span className={`${small ? "asset-logo small" : "asset-logo"}${isCash ? " cash-logo" : ""}`} style={{ background: isCash ? undefined : color }}>
-      {isCash ? (
+      {logoUrl ? (
+        <span className="logo-fallback">{assetInitials(asset)}</span>
+      ) : isCash ? (
         <span className="cash-stack" aria-hidden="true">
           <span />
           <span />
@@ -1730,7 +1732,7 @@ export default function Home() {
     const addAsset = (asset: Asset, location: string) => {
       const normalized = normalizeAsset(asset);
       const key = assetLogoCatalogKey(normalized);
-      if (!key || normalized.type === "Nakit") return;
+      if (!key) return;
       const catalog = state.logoCatalog?.[key];
       const visibleCatalog = catalog?.deleted ? undefined : catalog;
       const existing = map.get(key);

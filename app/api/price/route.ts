@@ -76,7 +76,7 @@ async function isPortfoyPrice(symbol: string) {
   if (!response.ok) throw new Error(`Is Portfoy ${response.status}`);
   const html = await response.text();
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-  const match = text.match(/Fon Birim Fiyat[\s\S]{0,160}?([0-9]{2}\.[0-9]{2}\.[0-9]{4})\s+([0-9]+,[0-9]+)/i);
+  const match = text.match(/Fon Birim Fiyat[\s\S]{0,180}?([0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4})\s+([0-9]+,[0-9]+)/i);
   if (!match) throw new Error("Is Portfoy fon fiyati okunamadi");
   const price = parseTurkishNumber(match[2]);
   if (!Number.isFinite(price) || price <= 0) throw new Error("Is Portfoy fiyat gecersiz");

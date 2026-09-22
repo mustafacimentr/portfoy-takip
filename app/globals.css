@@ -1881,7 +1881,15 @@ select:focus {
 }
 
 .print-report {
-  display: none;
+  position: fixed;
+  left: -200vw;
+  top: 0;
+  width: 210mm;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .analytics-layout {
@@ -3025,6 +3033,13 @@ label {
 
   .print-report {
     display: block;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: auto;
     color: #10243f;
     font-size: 10.5px;
   }
@@ -3190,6 +3205,13 @@ label {
 
   .print-report {
     display: block !important;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: auto;
     color: var(--ink);
     font-size: 10.5px;
   }

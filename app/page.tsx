@@ -576,7 +576,8 @@ function AssetLogo({ asset, color, small = false, logoCatalog }: { asset: Asset;
         <img
           src={logoUrl}
           alt=""
-          loading="lazy"
+          loading="eager"
+          decoding="sync"
           onError={(event) => {
             event.currentTarget.style.display = "none";
           }}
@@ -3501,7 +3502,22 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
-  function printPortfolioReport() {
+  async function waitForReportImages() {
+    const images = Array.from(document.querySelectorAll<HTMLImageElement>(".print-report img"));
+    await Promise.all(images.map(async (image) => {
+      image.loading = "eager";
+      if (image.complete && image.naturalWidth > 0) return;
+      await new Promise<void>((resolve) => {
+        const finish = () => resolve();
+        image.addEventListener("load", finish, { once: true });
+        image.addEventListener("error", finish, { once: true });
+        window.setTimeout(finish, 2500);
+      });
+      if (image.decode) await image.decode().catch(() => undefined);
+    }));
+  }
+
+  async function printPortfolioReport() {
     const previousTitle = document.title;
     const now = new Date();
     const parts = [
@@ -3512,10 +3528,14 @@ export default function Home() {
       now.getMinutes(),
     ].map((item) => String(item).padStart(2, "0"));
     document.title = `mustafa-cimen-portfoy-${parts.join("-")}`;
+    document.body.classList.add("print-preparing");
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await waitForReportImages();
     window.setTimeout(() => {
       window.print();
       window.setTimeout(() => {
         document.title = previousTitle;
+        document.body.classList.remove("print-preparing");
       }, 500);
     }, 50);
   }
